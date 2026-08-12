@@ -49,3 +49,11 @@
 - [ ] Ограничить вертикальный наклон и корректно освобождать pointer capture.
 - [ ] Добавить cursor/drag визуальную обратную связь и touch-action правила.
 - [ ] Проверить TypeScript, production build и интерактивный preview.
+
+## Imported template library — новый объём
+
+- [ ] Перенести генераторы checker, stripes, diag, chevron, brick, rings, swirl, waves, nested, noise, terrazzo и blocks.
+- [ ] Перенести шаблоны «Классика шахмат», «Мясная лавка», «Ёлочка», «Плетёнка», «Закат», «Терраццо», «Артефакт» и «Ночная геометрия».
+- [ ] Адаптировать индексы пород к активной палитре Woodcut Studio.
+- [ ] Добавить шаблоны и генераторы в текущую Pattern Library без потери seed-контроля.
+- [ ] Проверить TypeScript, production build и карточки библиотеки.

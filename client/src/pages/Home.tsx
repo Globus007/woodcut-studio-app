@@ -30,6 +30,17 @@ const PATTERNS = [
   { id: "voronoi", name: "CELLULAR FIELD", tag: "organic", description: "живые ячейки", icon: "⌬" },
   { id: "pinwheel", name: "PINWHEEL", tag: "旋", description: "вращающиеся лопасти", icon: "✣" },
   { id: "isometric", name: "ISOMETRIC", tag: "architectural", description: "пространственная сетка", icon: "▧" },
+  { id: "checker", name: "КЛАССИКА ШАХМАТ", tag: "classic", description: "равномерный контраст", icon: "♟" },
+  { id: "stripes", name: "МЯСНАЯ ЛАВКА", tag: "stripes", description: "ритм слоёв", icon: "▤" },
+  { id: "diag", name: "ЁЛОЧКА", tag: "diagonal", description: "диагональный срез", icon: "⟋" },
+  { id: "brick", name: "ПЛЕТЁНКА", tag: "weave", description: "кирпичная перевязка", icon: "▦" },
+  { id: "waves", name: "ЗАКАТ НАД ВЕРСТАКОМ", tag: "wave", description: "пульсирующие волны", icon: "≈" },
+  { id: "rings", name: "КОЛЬЦА", tag: "radial", description: "концентрические слои", icon: "◎" },
+  { id: "swirl", name: "АРТЕФАКТ", tag: "alien", description: "вихрь из другой вселенной", icon: "🌀" },
+  { id: "nested", name: "НОЧНАЯ ГЕОМЕТРИЯ", tag: "nested", description: "рамки и контуры", icon: "▣" },
+  { id: "noise", name: "ОРГАНИКА", tag: "organic", description: "мягкое поле шума", icon: "☁" },
+  { id: "terrazzo", name: "ТЕРРАЦЦО-ХАОС", tag: "wild", description: "пятна и осколки", icon: "🪩" },
+  { id: "blocks", name: "СЛУЧАЙНЫЕ БЛОКИ", tag: "wild", description: "неповторяющиеся модули", icon: "🎲" },
 ];
 
 type Cell = { material: number; rotate: number; flipX: boolean; flipY: boolean; variationSeed: number };
@@ -46,6 +57,17 @@ function makePattern(kind: string, rows = 12, cols = 16, materialIds = [0, 1, 2,
     if (kind === "voronoi") n = Math.floor((Math.sin((x + seed) * .77) + Math.cos((y - seed) * .61) + Math.sin((x + y) * .31)) * 5 + 10) % 5;
     if (kind === "pinwheel") n = (Math.floor(Math.atan2(y - rows / 2, x - cols / 2) * (3 + symmetry * 10) + (x + y) * chaos) + seed) % 5;
     if (kind === "isometric") n = (Math.floor((x + y) / 2) + Math.floor((x - y + cols) / 3) + seed) % 5;
+    if (kind === "checker") n = (Math.floor(x / 2) + Math.floor(y / 2) + seed) % 2;
+    if (kind === "stripes") n = Math.floor((x + seed % 4) / 2) % 4;
+    if (kind === "diag") n = Math.floor((x + y + seed) / 2) % 5;
+    if (kind === "brick") n = (Math.floor(y / 2) + Math.floor((x + (Math.floor(y / 2) % 2) * 2) / 4) + seed) % 5;
+    if (kind === "waves") n = Math.floor((y + Math.sin(x * 0.55 + seed) * (2 + chaos * 4)) / 2) % 5;
+    if (kind === "rings") n = Math.floor(Math.hypot(x - cols / 2, y - rows / 2) / (1.5 + symmetry * 2) + seed) % 5;
+    if (kind === "swirl") n = Math.floor((Math.atan2(y - rows / 2, x - cols / 2) * 4 + Math.hypot(x - cols / 2, y - rows / 2) * (1 + chaos * 2) + seed)) % 5;
+    if (kind === "nested") n = Math.min(x, y, cols - 1 - x, rows - 1 - y) % 5;
+    if (kind === "noise") n = Math.floor((Math.sin((x + seed) * .55) + Math.cos((y - seed) * .63) + Math.sin((x + y) * .27)) * 4 + 10) % 5;
+    if (kind === "terrazzo") n = Math.floor(Math.abs(Math.sin((x + seed) * 1.7 + Math.cos((y - seed) * 2.1)) * 10 + Math.sin((x - y) * .9))) % 5;
+    if (kind === "blocks") n = Math.floor(Math.abs(Math.sin(Math.floor(x / Math.max(1, 1 + chaos * 3)) * 12.9898 + Math.floor(y / Math.max(1, 1 + chaos * 2)) * 78.233 + seed)) * 100) % 5;
     const seedNoise = Math.sin((x + 1) * 12.9898 + (y + 1) * 78.233 + seed * 37.7) * 43758.5453;
     n = Math.abs(Math.floor(n + (seedNoise - Math.floor(seedNoise)) * chaos * materialIds.length));
     return { material: materialIds[(n + materialIds.length) % materialIds.length], rotate: ((x + y + seed) % 4) * 90, flipX: kind === "chaos" && x % 5 === 0, flipY: kind === "cube" && y % 4 === 0, variationSeed: x * 97 + y * 53 + kind.length * 31 + seed * 17 };
