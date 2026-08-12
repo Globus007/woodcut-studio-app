@@ -65,3 +65,12 @@
 - [ ] Добавить canvas-превью в карточки Pattern Library.
 - [ ] Обновлять карточки при смене seed, chaos, symmetry или палитры.
 - [ ] Проверить читаемость, performance и production build.
+
+## Favorites and custom patterns — новый объём
+
+- [ ] Добавить локальную модель favorites и customPatterns.
+- [ ] Сохранять пользовательский узор вместе с grid, палитрой и параметрами генерации.
+- [ ] Добавить диалог «Сохранить как шаблон» с названием и описанием.
+- [ ] Добавить избранное для встроенных и пользовательских карточек.
+- [ ] Добавить вкладки All / Favorites / My patterns в Pattern Library.
+- [ ] Проверить восстановление из localStorage, TypeScript и production build.
