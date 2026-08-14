@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ТОРЦЕГРАММА — генератор узоров торцевых досок</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪵</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/unbounded@latest/cyrillic-600-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/unbounded@latest/cyrillic-800-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/cyrillic-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/cyrillic-500-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/cyrillic-700-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/latin-500-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/manrope@latest/latin-700-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/cyrillic-400-normal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/fontsource/fonts/jetbrains-mono@latest/latin-400-normal.css">
+<style>
+:root{
+  --bg:#131009; --panel:#1c1610; --panel2:#262019; --panel3:#2e261c;
+  --line:#3a2f20; --line2:#4a3c28;
+  --ink:#f1e6d2; --mut:#a3927a; --dim:#6f6250;
+  --amber:#e8a33d; --amber2:#f5c469; --amberD:#8a5c17;
+  --ok:#8fbf72; --warn:#e0a63c; --err:#e06552;
+  --disp:'Unbounded',sans-serif; --body:'Manrope',sans-serif; --mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(1200px 500px at 80% -10%, rgba(232,163,61,.06), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(120,80,40,.08), transparent 60%),
+    var(--bg);
+  color:var(--ink); font-family:var(--body); font-size:14px;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:#3d3223;border-radius:8px;border:2px solid var(--bg)}
+::-webkit-scrollbar-track{background:transparent}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font-family:inherit;color:var(--ink);background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;outline:none}
+input:focus,select:focus{border-color:var(--amber)}
+input[type=color]{padding:2px;width:34px;height:30px;cursor:pointer}
+input[type=range]{accent-color:var(--amber);padding:0;border:none;background:transparent;width:100%}
+input[type=checkbox]{accent-color:var(--amber);width:16px;height:16px;cursor:pointer}
+input[type=number]{width:76px;font-family:var(--mono);font-size:12px}
+label{font-size:12px;color:var(--mut)}
+/* ---------- header ---------- */
+header{
+  flex:0 0 auto;display:flex;
+  padding:9px 16px;border-bottom:1px solid var(--line);
+  background:linear-gradient(180deg,#221a11,#191410);
+}
+.hwrap{width:100%;max-width:1720px;margin:0 auto;display:flex;align-items:center;gap:14px}
+.logo{font-family:var(--disp);font-weight:800;font-size:17px;letter-spacing:.06em;display:flex;align-items:center;gap:9px;white-space:nowrap}
+.logo .mark{display:inline-grid;grid-template-columns:repeat(2,9px);gap:2px}
+.logo .mark i{width:9px;height:9px;border-radius:2px;display:block}
+.logo b{color:var(--amber)}
+.tagline{font-size:11px;color:var(--dim);margin-left:-4px;white-space:nowrap}
+#projName{font-family:var(--disp);font-weight:600;font-size:13px;background:transparent;border:1px dashed transparent;min-width:180px;max-width:300px}
+#projName:hover{border-color:var(--line2)}
+.spacer{flex:1}
+.hbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel2);font-size:12.5px;font-weight:700;transition:.15s;white-space:nowrap}
+.hbtn:hover{border-color:var(--amber);transform:translateY(-1px)}
+.hbtn.primary{background:linear-gradient(180deg,var(--amber),#cf8c27);color:#241505;border-color:#a56f1c}
+.hbtn.primary:hover{filter:brightness(1.08)}
+/* ---------- layout ---------- */
+main{flex:1;display:grid;grid-template-columns:302px 1fr 372px;gap:12px;padding:12px;min-height:0;width:100%;max-width:1720px;margin:0 auto}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.tabbar{display:flex;gap:4px;padding:8px 8px 0;flex-wrap:wrap}
+.tabbar button{padding:7px 11px;border-radius:9px 9px 0 0;font-size:12px;font-weight:700;color:var(--mut);border:1px solid transparent;border-bottom:none}
+.tabbar button.on{background:var(--panel2);color:var(--amber2);border-color:var(--line)}
+.tabcontent{flex:1;overflow-y:auto;padding:14px;background:var(--panel2);border-top:1px solid var(--line);margin:0 8px 8px;border-radius:0 0 10px 10px}
+.pane{display:none}
+.pane.on{display:block}
+.sect{margin-bottom:18px}
+.sect h4{font-family:var(--disp);font-weight:600;font-size:11px;letter-spacing:.14em;color:var(--amber);margin-bottom:9px;display:flex;align-items:center;gap:7px;text-transform:uppercase}
+.sect h4::after{content:'';flex:1;height:1px;background:var(--line)}
+.row{display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap}
+.row.grow{justify-content:space-between}
+.hint{font-size:11px;color:var(--dim);line-height:1.45;margin-top:4px}
+/* ---------- buttons ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:7px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel3);font-size:12.5px;font-weight:700;transition:.15s}
+.btn:hover{border-color:var(--amber);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn.on{background:var(--amber);color:#241505;border-color:#a56f1c}
+.btn.big{width:100%;padding:10px;font-size:13px}
+.btn.warn{border-color:#7a3a2c;color:#f0a394}
+.icobtn{width:36px;height:34px;padding:0;font-size:15px}
+.btn[disabled]{opacity:.4;pointer-events:none}
+/* ---------- palette chips ---------- */
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{width:38px;height:26px;border-radius:7px;border:2px solid rgba(0,0,0,.5);cursor:pointer;position:relative;transition:.12s;box-shadow:inset 0 -3px 6px rgba(0,0,0,.25), inset 0 2px 3px rgba(255,255,255,.18)}
+.chip:hover{transform:translateY(-2px)}
+.chip.on{border-color:var(--amber);box-shadow:0 0 0 2px rgba(232,163,61,.35), inset 0 -3px 6px rgba(0,0,0,.25)}
+/* ---------- species editor ---------- */
+.sp-row{display:grid;grid-template-columns:36px 1fr 62px 78px 30px 26px;gap:6px;align-items:center;margin-bottom:6px;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:6px}
+.sp-row.off{opacity:.42}
+.sp-row input[type=text]{background:transparent;border-color:transparent;font-weight:700;width:100%;min-width:0}
+.sp-row input[type=text]:focus{border-color:var(--amber);background:var(--panel2)}
+.sp-row .sp-cap{font-size:10px;color:var(--dim);display:block}
+/* ---------- templates ---------- */
+.tpl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.tpl{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel);cursor:pointer;transition:.15s}
+.tpl:hover{border-color:var(--amber);transform:translateY(-2px)}
+.tpl canvas{width:100%;display:block}
+.tpl div{font-size:11px;font-weight:700;padding:5px 7px;color:var(--mut)}
+/* ---------- center ---------- */
+.center{display:flex;flex-direction:column;min-height:0;min-width:0;gap:10px}
+.toolbar{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 10px;flex-wrap:wrap}
+.toolbar .sep{width:1px;height:24px;background:var(--line);margin:0 4px}
+.toolbar select{padding:6px}
+/* ВАЖНО: flex + margin:auto — макет по центру, при зуме не «улетает»,
+   а аккуратно появляется скролл до левого-верхнего края */
+#canvasWrap{flex:1;display:flex;overflow:auto;
+  background:
+  radial-gradient(700px 340px at 50% 30%, rgba(232,163,61,.05), transparent 70%),
+  repeating-linear-gradient(45deg, rgba(255,255,255,.012) 0 2px, transparent 2px 14px), var(--panel);
+  border:1px solid var(--line);border-radius:16px;padding:18px;min-height:0;position:relative}
+#stage{position:relative;line-height:0;margin:auto;flex:0 0 auto;filter:drop-shadow(0 18px 34px rgba(0,0,0,.55))}
+#stage canvas{position:absolute;left:0;top:0}
+#boardCv{position:relative}
+.statusbar{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:7px 12px;font-family:var(--mono);font-size:11.5px;color:var(--mut);flex-wrap:wrap}
+.statusbar b{color:var(--amber2);font-weight:400}
+.statusbar .dot{width:8px;height:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+/* ---------- right panel widgets ---------- */
+.statgrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.stat .k{font-size:10.5px;color:var(--dim);letter-spacing:.05em;text-transform:uppercase}
+.stat .v{font-family:var(--mono);font-size:14.5px;color:var(--amber2);margin-top:2px}
+.stat .v small{color:var(--mut);font-size:10px}
+#gl3d{width:100%;height:295px;border-radius:12px;overflow:hidden;background:#171310;border:1px solid var(--line);position:relative}
+#gl3d canvas{display:block}
+.err3d{display:grid;place-items:center;height:100%;color:var(--dim);font-size:12px;text-align:center;padding:20px}
+table.mini{width:100%;border-collapse:collapse;font-size:12px}
+table.mini th{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:4px 5px;border-bottom:1px solid var(--line)}
+table.mini td{padding:5px;border-bottom:1px solid rgba(58,47,32,.5);font-family:var(--mono);font-size:11.5px}
+table.mini td:first-child{font-family:var(--body);font-weight:700}
+table.mini tr.total td{border-top:2px solid var(--line2);border-bottom:none;font-weight:700;color:var(--amber2)}
+.sw{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:6px;vertical-align:-2px;border:1px solid rgba(0,0,0,.4)}
+/* glue steps */
+.glue-step{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:7px}
+.gs-head{font-size:11.5px;font-weight:700;margin-bottom:6px;color:var(--amber2)}
+.gs-bar{display:flex;height:20px;border-radius:5px;overflow:hidden;border:1px solid rgba(0,0,0,.45)}
+.gs-bar i{display:block;height:100%}
+.gs-meta{font-size:10.5px;color:var(--mut);margin-top:5px;font-family:var(--mono)}
+/* pack cards */
+.pack-card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px;margin-bottom:10px}
+.pc-head{font-size:12px;font-weight:700;margin-bottom:7px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pc-head small{color:var(--mut);font-weight:400;font-family:var(--mono)}
+.pack-card svg{width:100%;display:block;margin-bottom:5px;border-radius:4px}
+.pack-more{font-size:10.5px;color:var(--dim);font-family:var(--mono)}
+/* checks */
+.chk{display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:9px;margin-bottom:6px;font-size:12.5px;line-height:1.4;border:1px solid var(--line);background:var(--panel)}
+.chk.ok{border-color:#3d5b32;background:#1d2618}
+.chk.warn{border-color:#6b5320;background:#251e10}
+.chk.err{border-color:#702f24;background:#271512}
+/* toast */
+#toasts{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:99;pointer-events:none}
+.toast{background:linear-gradient(180deg,#31271a,#241b10);border:1px solid var(--line2);color:var(--ink);padding:10px 18px;border-radius:11px;font-size:13px;font-weight:700;box-shadow:0 10px 28px rgba(0,0,0,.5);animation:tin .25s ease, tout .4s ease 2.6s forwards;white-space:nowrap}
+@keyframes tin{from{opacity:0;transform:translateY(14px) scale(.95)}}
+@keyframes tout{to{opacity:0;transform:translateY(8px)}}
+/* report (print) */
+#report{display:none}
+@media print{
+  @page{size:A4;margin:11mm}
+  body{display:block !important;background:#fff;color:#000;overflow:visible}
+  #appUI{display:none !important}
+  #report{display:block !important;font-family:Georgia,serif;font-size:11px;color:#111}
+  #report h1{font-size:20px;margin-bottom:2px}
+  #report h2{font-size:13px;border-bottom:2px solid #111;padding-bottom:3px;margin:14px 0 7px;text-transform:uppercase;letter-spacing:.05em}
+  #report .rsub{color:#555;margin-bottom:8px}
+  #report table{width:100%;border-collapse:collapse;font-size:10.5px}
+  #report td,#report th{border:1px solid #999;padding:3px 5px;text-align:left}
+  #report .rgrid{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  #report img.pat{max-width:280px;border:1px solid #333}
+  #report .note{background:#f3ede1;border:1px solid #c9b98f;padding:6px 8px;border-radius:4px;margin:4px 0;font-size:10.5px}
+  #report svg{max-width:100%;margin:4px 0}
+  .avoid{break-inside:avoid}
+}
+@media (max-width:1240px){
+  body{overflow:auto}
+  main{grid-template-columns:1fr;height:auto}
+  .panel{max-height:none}
+  .center{order:-1}
+  #canvasWrap{min-height:420px}
+  header .hwrap{flex-wrap:wrap;height:auto;gap:8px}
+  .tagline{display:none}
+}
+</style>
+</head>
+<body>
+<div id="appUI" style="display:contents">
+<header>
+  <div class="hwrap">
+    <div class="logo">
+      <span class="mark">
+        <i style="background:#e8a33d"></i><i style="background:#6e4b33"></i>
+        <i style="background:#3e2c21"></i><i style="background:#c6552f"></i>
+      </span>
+      ТОРЦЕ<b>ГРАММА</b>
+    </div>
+    <span class="tagline">генератор узоров торцевых досок · вайб-неделя edition</span>
+    <input id="projName" value="Доска №1" title="Название проекта">
+    <button class="btn icobtn" id="btnDiceName" title="Случайное название">🎰</button>
+    <div class="spacer"></div>
+    <button class="hbtn" id="btnNew">🆕 Новый</button>
+    <button class="hbtn" id="btnOpen">📂 Открыть</button>
+    <button class="hbtn" id="btnSave">💾 Сохранить</button>
+    <button class="hbtn" id="btnPng">🖼 PNG</button>
+    <button class="hbtn primary" id="btnPrint">🖨 Инструкция → PDF</button>
+    <input type="file" id="fileOpen" accept=".json,application/json" hidden>
+    <input type="file" id="fileImport" accept="image/*" hidden>
+  </div>
+</header>
+
+<main>
+<!-- ============ LEFT ============ -->
+<aside class="panel">
+  <div class="tabbar" id="leftTabs">
+    <button data-tab="tPattern" class="on">🎨 Узор</button>
+    <button data-tab="tWood">🪵 Дерево</button>
+    <button data-tab="tBoard">📐 Доска</button>
+  </div>
+  <div class="tabcontent">
+    <!-- PATTERN -->
+    <div class="pane on" id="tPattern">
+      <div class="sect">
+        <h4>Кисть</h4>
+        <div class="chips" id="spChips"></div>
+        <div class="hint">ЛКМ — красить, ПКМ — пипетка. Хоткеи: <b style="color:var(--amber2)">B</b> кисть, <b style="color:var(--amber2)">F</b> заливка, <b style="color:var(--amber2)">I</b> пипетка.</div>
+      </div>
+      <div class="sect">
+        <h4>Генераторы</h4>
+        <div class="row"><select id="genSel" style="flex:1"></select></div>
+        <div class="row">
+          <label style="width:62px">Масштаб <b id="genKval" style="color:var(--amber2)">2</b></label>
+          <input type="range" id="genK" min="1" max="6" step="1" value="2" style="flex:1">
+        </div>
+        <div class="row">
+          <button class="btn" id="btnSeed" title="Новое зерно">🎲 Зерно</button>
+          <span id="seedVal" style="font-family:var(--mono);font-size:11px;color:var(--dim)">#1</span>
+          <span class="spacer"></span>
+          <button class="btn on" id="btnApplyGen">Применить</button>
+        </div>
+        <div class="row" style="margin-top:9px">
+          <button class="btn big" id="btnWild" style="background:linear-gradient(90deg,#7a4a2e,#c6552f);border:none;color:#fff">🌀 ДИКИЙ СЛУЧАЙНЫЙ УЗОР</button>
+        </div>
+      </div>
+      <div class="sect">
+        <h4>Трансформации</h4>
+        <div class="row">
+          <button class="btn icobtn" id="trRotL" title="Поворот против часовой">↺</button>
+          <button class="btn icobtn" id="trRotR" title="Поворот по часовой">↻</button>
+          <button class="btn icobtn" id="trFlipH" title="Отразить по горизонтали">⇋</button>
+          <button class="btn icobtn" id="trFlipV" title="Отразить по вертикали">⇅</button>
+          <span style="width:1px;height:24px;background:var(--line)"></span>
+          <button class="btn icobtn" id="trShL" title="Сдвиг рядов влево">←</button>
+          <button class="btn icobtn" id="trShR" title="Сдвиг рядов вправо">→</button>
+          <button class="btn icobtn" id="trShU" title="Сдвиг колонок вверх">↑</button>
+          <button class="btn icobtn" id="trShD" title="Сдвиг колонок вниз">↓</button>
+        </div>
+        <div class="hint">Сдвиги закольцованы — удобно подгонять ритм узора.</div>
+      </div>
+      <div class="sect">
+        <h4>Библиотека шаблонов</h4>
+        <div class="tpl-grid" id="tplGrid"></div>
+      </div>
+      <div class="sect">
+        <h4>Импорт</h4>
+        <button class="btn big" id="btnImport">🖼 Превратить фото в узор</button>
+        <div class="hint">Картинка усредняется до клеток сетки и пикселизируется породами.</div>
+      </div>
+    </div>
+    <!-- WOOD -->
+    <div class="pane" id="tWood">
+      <div class="sect">
+        <h4>Породы и цены</h4>
+        <div class="hint" style="margin-bottom:8px">Цвет · название · плотность кг/м³ · цена ₽/м³. Выключенные породы не участвуют в генераторах.</div>
+        <div id="spEditor"></div>
+        <button class="btn big" id="btnAddSp" style="margin-top:6px">＋ Добавить породу</button>
+      </div>
+    </div>
+    <!-- BOARD -->
+    <div class="pane" id="tBoard">
+      <div class="sect">
+        <h4>Габариты</h4>
+        <div class="row grow"><label>Клеток вдоль (шт)</label><input type="number" id="inCols" min="2" max="40"></div>
+        <div class="row grow"><label>Клеток поперёк (шт)</label><input type="number" id="inRows" min="2" max="40"></div>
+        <div class="row grow"><label>Размер клетки, мм</label><input type="number" id="inCell" min="5" max="150" step="1"></div>
+        <div class="row grow"><label>Толщина доски, мм</label><input type="number" id="inThick" min="10" max="120" step="1"></div>
+        <div class="row grow"><label>Ширина пропила, мм</label><input type="number" id="inKerf" min="0" max="6" step="0.1"></div>
+      </div>
+      <div class="sect">
+        <h4>Раскрой и потери</h4>
+        <div class="row grow"><label>Заготовка: длина, мм</label><input type="number" id="stLen" min="100" max="6000"></div>
+        <div class="row grow"><label>Заготовка: ширина, мм</label><input type="number" id="stWid" min="20" max="1000"></div>
+        <div class="row grow"><label>Заготовка: толщина, мм</label><input type="number" id="stThk" min="10" max="200"></div>
+        <div class="row grow"><label>Запас на обработку, %</label><input type="number" id="inWaste" min="0" max="80"></div>
+      </div>
+      <div class="sect">
+        <h4>Отображение</h4>
+        <div class="row grow"><label>Единицы</label>
+          <select id="inUnit"><option value="mm">мм</option><option value="in">дюймы</option></select>
+        </div>
+        <div class="row"><input type="checkbox" id="inTexture"><label for="inTexture">Текстура торца (годовые кольца)</label></div>
+        <div class="hint">Проект автосохраняется в браузере. 💾 — выгрузка файла .json.</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ CENTER ============ -->
+<section class="center">
+  <div class="toolbar">
+    <button class="btn on" data-tool="brush" title="Кисть (B)">🖌 Кисть</button>
+    <button class="btn" data-tool="fill" title="Заливка (F)">🪣 Заливка</button>
+    <button class="btn" data-tool="pick" title="Пипетка (I)">🧷 Пипетка</button>
+    <span class="toolbar sep"></span>
+    <label>Симметрия</label>
+    <select id="symSel">
+      <option value="0">нет</option>
+      <option value="1">вертикальная</option>
+      <option value="2">горизонтальная</option>
+      <option value="3">квадрат ×4</option>
+    </select>
+    <span class="toolbar sep"></span>
+    <button class="btn icobtn" id="btnUndo" title="Отменить (Ctrl+Z)">↩</button>
+    <button class="btn icobtn" id="btnRedo" title="Вернуть (Ctrl+Y)">↪</button>
+    <span class="spacer"></span>
+    <label>Зум</label>
+    <input type="range" id="zoomR" min="0.4" max="3" step="0.05" value="1" style="width:110px">
+  </div>
+  <div id="canvasWrap">
+    <div id="stage">
+      <canvas id="boardCv"></canvas>
+      <canvas id="ovCv"></canvas>
+    </div>
+  </div>
+  <div class="statusbar">
+    <span class="dot"></span>
+    <span id="stCell">—</span>
+    <span id="stDims">—</span>
+    <span id="stParts">—</span>
+    <span class="spacer"></span>
+    <span id="stSave">автосохранение: вкл</span>
+  </div>
+</section>
+
+<!-- ============ RIGHT ============ -->
+<aside class="panel">
+  <div class="tabbar" id="rightTabs">
+    <button data-tab="tView" class="on">🧊 Вид</button>
+    <button data-tab="tParts">🧱 Склейка</button>
+    <button data-tab="tCut">🪚 Раскрой</button>
+    <button data-tab="tCost">💰 Смета</button>
+    <button data-tab="tCheck">🚦 Проверка</button>
+  </div>
+  <div class="tabcontent">
+    <div class="pane on" id="tView">
+      <div class="sect">
+        <h4>3D-превью</h4>
+        <div id="gl3d"><div class="err3d">Загружаю 3D…</div></div>
+        <div class="row" style="margin-top:9px">
+          <input type="checkbox" id="chkSpin" checked><label for="chkSpin">Автовращение</label>
+        </div>
+        <div class="row">
+          <label style="width:110px">Взрыв-схема рядов</label>
+          <input type="range" id="explodeR" min="0" max="1" step="0.01" value="0" style="flex:1">
+        </div>
+        <div class="hint">ЛКМ — вращать · колесо — зум · ПКМ — двигать. Взрыв-схема показывает, как ряды-ламели сходятся в щит.</div>
+      </div>
+      <div class="sect">
+        <h4>Сводка</h4>
+        <div class="statgrid" id="viewStats"></div>
+      </div>
+    </div>
+    <div class="pane" id="tParts">
+      <div class="sect">
+        <h4>Детали по породам</h4>
+        <div id="partsTable"></div>
+      </div>
+      <div class="sect">
+        <h4>Пошаговая переклейка</h4>
+        <div class="hint" style="margin-bottom:8px">Стратегия: сначала каждый ряд склеивается в ламель, затем ламели собираются в щит.</div>
+        <div id="glueList"></div>
+      </div>
+    </div>
+    <div class="pane" id="tCut">
+      <div class="sect">
+        <h4>Карта раскроя</h4>
+        <div class="hint" style="margin-bottom:8px" id="cutHint"></div>
+        <div id="cutList"></div>
+      </div>
+    </div>
+    <div class="pane" id="tCost">
+      <div class="sect">
+        <h4>Материалы и себестоимость</h4>
+        <div id="costTable"></div>
+      </div>
+      <div class="sect">
+        <h4>Итог</h4>
+        <div class="statgrid" id="costStats"></div>
+        <div class="hint" id="funLine" style="margin-top:8px"></div>
+      </div>
+    </div>
+    <div class="pane" id="tCheck">
+      <div class="sect">
+        <h4>Физическая реализуемость</h4>
+        <div id="checkList"></div>
+      </div>
+    </div>
+  </div>
+</aside>
+</main>
+</div>
+
+<div id="toasts"></div>
+<div id="report"></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+/* ================= utils ================= */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function hash2(a,b,salt=0){let h=(a*374761393+b*668265263+salt*974634)|0;h=(h^(h>>13))|0;h=Math.imul(h,1274126177);return((h^(h>>16))>>>0)}
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16);let r=n>>16,g=n>>8&255,b=n&255;
+  const t=amt<0?0:255,p=Math.abs(amt);
+  r=Math.round(r+(t-r)*p);g=Math.round(g+(t-g)*p);b=Math.round(b+(t-b)*p);
+  return '#'+((1<<24)|(r<<16)|(g<<8)|b).toString(16).slice(1);
+}
+function hexToRgb(h){const n=parseInt(h.slice(1),16);return[n>>16,n>>8&255,n&255]}
+const nf=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2});
+const fmtRub=v=>nf.format(Math.round(v))+' ₽';
+function toast(msg){
+  const t=document.createElement('div');t.className='toast';t.textContent=msg;
+  const box=$('#toasts');box.appendChild(t);while(box.children.length>3)box.firstChild.remove();
+  setTimeout(()=>t.remove(),3200);
+}
+const QUOTES=['Семь раз отмерь — один раз склей.','Струбцин много не бывает.','Орех сам себя не нарежет.','Клей сохнет — кофе пьётся.','Острая пила — счастливая пила.','Эта доска переживёт апокалипсис.','Сначала фуганок, потом философия.','Не сучок, а дизайнерский акцент.'];
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+function genName(){
+  const A=['Кленовый','Ореховый','Дымчатый','Квантовый','Северный','Медовый','Геометрический','Лунный','Бразильский','Взрывной','Шёпотный','Янтарный'];
+  const B=['закат','вихрь','артефакт','сэндвич','улей','разлом','прибой','пиксель','монолог','горизонт','котёл','туман'];
+  return `${rnd(A)} ${rnd(B)} №${1+Math.floor(Math.random()*99)}`;
+}
+
+/* ================= species ================= */
+const WOODS=[
+ {n:'Клён',   c:'#E9CF9F', ring:'#C2A165', d:650, p:75000},
+ {n:'Ясень',  c:'#DCC794', ring:'#B0965F', d:680, p:60000},
+ {n:'Берёза', c:'#EBDCB6', ring:'#C9B98E', d:640, p:42000},
+ {n:'Дуб',    c:'#C89B5C', ring:'#9A7137', d:700, p:85000},
+ {n:'Тик',    c:'#B08050', ring:'#875D33', d:630, p:95000},
+ {n:'Вишня',  c:'#B4674A', ring:'#8B4630', d:580, p:90000},
+ {n:'Падук',  c:'#C6552F', ring:'#91371B', d:750, p:130000},
+ {n:'Орех',   c:'#6E4B33', ring:'#4B3221', d:600, p:160000},
+ {n:'Мербау', c:'#8A5232', ring:'#5F351E', d:800, p:150000},
+ {n:'Венге',  c:'#3E2C21', ring:'#221610', d:850, p:230000},
+];
+WOODS.forEach(w=>w.on=true);
+
+/* ================= state ================= */
+function defaultState(){
+  return {
+    v:2, name:genName(),
+    cols:16, rows:10, cell:30, thickness:36, kerf:2.5,
+    unit:'mm', waste:18, texture:true,
+    stock:{len:2000,width:160,thick:50},
+    species:WOODS.map(w=>({...w})),
+    grid:new Uint8Array(160)
+  };
+}
+let S=defaultState();
+let curSpecies=7, curTool='brush', symMode=0, zoom=1;
+let seedVal=1;
+
+const LS_KEY='torcegramma.v2';
+let saveTimer=null;
+function autosave(){
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(()=>{ try{localStorage.setItem(LS_KEY,JSON.stringify(serialize()))}catch(e){} },700);
+}
+function serialize(){return{...S,grid:Array.from(S.grid)}}
+function deserialize(o){
+  const d=defaultState();
+  S={...d,...o,species:(o.species&&o.species.length?o.species:d.species).map(w=>({...w,on:w.on!==false})),grid:new Uint8Array(o.grid||[])};
+  if(S.grid.length!==S.cols*S.rows)S.grid=new Uint8Array(S.cols*S.rows);
+}
+
+/* ================= history ================= */
+const undoStack=[],redoStack=[];
+function snapshot(){return{g:S.grid.slice(),c:S.cols,r:S.rows}}
+function pushHistory(){undoStack.push(snapshot());if(undoStack.length>60)undoStack.shift();redoStack.length=0}
+function applySnap(st){S.grid=st.g.slice();S.cols=st.c;S.rows=st.r;layoutCanvas();refreshAll()}
+function undo(){if(!undoStack.length)return;redoStack.push(snapshot());applySnap(undoStack.pop())}
+function redo(){if(!redoStack.length)return;undoStack.push(snapshot());applySnap(redoStack.pop())}
+
+/* ================= grid ops ================= */
+const gi=(c,r)=>r*S.cols+c;
+function setCellSafe(c,r,s){
+  const list=[[c,r]];
+  if(symMode===1||symMode===3)list.push([S.cols-1-c,r]);
+  if(symMode===2||symMode===3)list.push([c,S.rows-1-r]);
+  if(symMode===3)list.push([S.cols-1-c,S.rows-1-r]);
+  for(const[cc,rr]of list)if(cc>=0&&cc<S.cols&&rr>=0&&rr<S.rows)S.grid[gi(cc,rr)]=s;
+}
+function floodFill(c,r,s){
+  const target=S.grid[gi(c,r)];if(target===s)return;
+  const st=[[c,r]];
+  while(st.length){
+    const[x,y]=st.pop();if(x<0||y<0||x>=S.cols||y>=S.rows)continue;
+    if(S.grid[gi(x,y)]!==target)continue;
+    S.grid[gi(x,y)]=s;
+    st.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+  }
+}
+function resizeGrid(nc,nr){
+  const old=S.grid,oc=S.cols,orw=S.rows;
+  const g=new Uint8Array(nc*nr);
+  for(let r=0;r<nr;r++)for(let c=0;c<nc;c++){
+    g[r*nc+c]=old[clamp(Math.floor(r*orw/nr),0,orw-1)*oc+clamp(Math.floor(c*oc/nc),0,oc-1)];
+  }
+  S.grid=g;S.cols=nc;S.rows=nr;
+}
+function transform(fn){
+  pushHistory();
+  const oc=S.cols,orw=S.rows;
+  const{g,c,r}=fn();
+  S.grid=g;S.cols=c;S.rows=r;
+  if(c!==oc||r!==orw)layoutCanvas(); // рефит только если габариты сетки изменились
+  refreshAll();
+}
+function rotCW(){const g=new Uint8Array(S.cols*S.rows);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[c*S.rows+(S.rows-1-r)]=S.grid[gi(c,r)];return{g,c:S.rows,r:S.cols}}
+function rotCCW(){const g=new Uint8Array(S.cols*S.rows);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[(S.cols-1-c)*S.rows+r]=S.grid[gi(c,r)];return{g,c:S.rows,r:S.cols}}
+function flipH(){const g=new Uint8Array(S.grid.length);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[gi(S.cols-1-c,r)]=S.grid[gi(c,r)];return{g,c:S.cols,r:S.rows}}
+function flipV(){const g=new Uint8Array(S.grid.length);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[gi(c,S.rows-1-r)]=S.grid[gi(c,r)];return{g,c:S.cols,r:S.rows}}
+function shiftRows(dx){const g=new Uint8Array(S.grid.length);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[gi((c+dx+S.cols)%S.cols,r)]=S.grid[gi(c,r)];return{g,c:S.cols,r:S.rows}}
+function shiftCols(dy){const g=new Uint8Array(S.grid.length);for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++)g[gi(c,(r+dy+S.rows)%S.rows)]=S.grid[gi(c,r)];return{g,c:S.cols,r:S.rows}}
+
+/* ================= generators ================= */
+const pmod=(a,b)=>((a%b)+b)%b;
+const GEN={
+  checker:{name:'♟ Шахматка',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor(cc/k)+Math.floor(r/k))}},
+  stripes:{name:'🥓 Полосы',fn(set,c,ro,k,rnd,L){const off=Math.floor(rnd()*4);for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor((cc+off)/k))}},
+  diag:{name:'⟋ Диагонали',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor((cc+r)/k))}},
+  chevron:{name:'🔻 Шевроны',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++){const t=Math.abs(pmod(cc,2*k)-k);set(r,cc,Math.floor((r+t)/k))}}},
+  brick:{name:'🧱 Кирпичики',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++){const rb=Math.floor(r/k);for(let cc=0;cc<c;cc++)set(r,cc,Math.floor((cc+(rb%2)*k)/(2*k))+rb)}}},
+  rings:{name:'⭕ Кольца',fn(set,c,ro,k,rnd,L){const cx=(c-1)/2,cy=(ro-1)/2;for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor(Math.hypot(cc-cx,r-cy)/k))}},
+  swirl:{name:'🌀 Вихрь',fn(set,c,ro,k,rnd,L){const cx=(c-1)/2,cy=(ro-1)/2,tw=1+rnd()*2;for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++){const a=Math.atan2(r-cy,cc-cx),d=Math.hypot(cc-cx,r-cy);set(r,cc,Math.floor(a/Math.PI*L/2+d/k*tw))}}},
+  waves:{name:'🌊 Волны',fn(set,c,ro,k,rnd,L){const ph=rnd()*6.28,amp=k*(1+rnd()*1.4);for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor((r+Math.sin(cc*0.55+ph)*amp)/k))}},
+  nested:{name:'▣ Рамки',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++){const d=Math.min(cc,r,c-1-cc,ro-1-r);set(r,cc,Math.floor(d/k))}}},
+  noise:{name:'☁ Шум (органика)',fn(set,c,ro,k,rnd,L){
+    const gs=Math.ceil(Math.max(c,ro)/k)+3,lat=[];
+    for(let i=0;i<gs*gs;i++)lat.push(rnd());
+    const lv=(x,y)=>{const x0=Math.floor(x),y0=Math.floor(y),fx=x-x0,fy=y-y0;
+      const sx=fx*fx*(3-2*fx),sy=fy*fy*(3-2*fy);
+      const g=(a,b)=>lat[clamp(b,0,gs-1)*gs+clamp(a,0,gs-1)];
+      return g(x0,y0)*(1-sx)*(1-sy)+g(x0+1,y0)*sx*(1-sy)+g(x0,y0+1)*(1-sx)*sy+g(x0+1,y0+1)*sx*sy;};
+    for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++){const t=lv(cc/k,r/k);set(r,cc,clamp(Math.floor(t*L*1.35-L*0.18),0,L-1))}
+  }},
+  terrazzo:{name:'🪩 Терраццо',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,0);
+    const blobs=14+Math.floor(rnd()*(c*ro)/7);
+    for(let i=0;i<blobs;i++){const bx=rnd()*c,by=rnd()*ro,rad=k*(0.8+rnd()*2.4),si=Math.floor(rnd()*L);
+      for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)if(Math.hypot(cc-bx,r-by)<=rad)set(r,cc,si);}}},
+  blocks:{name:'🎲 Случайные блоки',fn(set,c,ro,k,rnd,L){for(let r=0;r<ro;r++)for(let cc=0;cc<c;cc++)set(r,cc,Math.floor(rnd()*L));
+    const n=Math.floor(c*ro/6);
+    for(let i=0;i<n;i++){const x=Math.floor(rnd()*c),y=Math.floor(rnd()*ro),w=1+Math.floor(rnd()*k*2),h=1+Math.floor(rnd()*k*2),si=Math.floor(rnd()*L);
+      for(let r=y;r<Math.min(ro,y+h);r++)for(let cc=x;cc<Math.min(c,x+w);cc++)set(r,cc,si);}}},
+};
+const enabledSp=()=>S.species.map((sp,i)=>sp.on?i:-1).filter(i=>i>=0);
+function applyGen(id,k,seed){
+  const sp=enabledSp();
+  if(sp.length<2){toast('Включите минимум 2 породы во вкладке «Дерево»');return}
+  pushHistory();
+  const rnd=mulberry32(seed*7919+13);
+  const L=sp.length;
+  GEN[id].fn((r,c,si)=>{S.grid[gi(c,r)]=sp[pmod(si,L)]},S.cols,S.rows,k,rnd,L);
+  refreshAll();
+}
+
+/* ================= templates ================= */
+const TEMPLATES=[
+ {id:'classic',e:'♟️',name:'Классика шахмат',sp:[7,0],gen:'checker',k:2,seed:3},
+ {id:'butcher',e:'🥩',name:'Мясная лавка',sp:[3,0,7],gen:'stripes',k:2,seed:11},
+ {id:'diag',e:'🌲',name:'Ёлочка по диагонали',sp:[7,0],gen:'diag',k:2,seed:5},
+ {id:'weave',e:'🧺',name:'Плетёнка',sp:[7,0,3],gen:'brick',k:2,seed:8},
+ {id:'sunset',e:'🌅',name:'Закат над верстаком',sp:[5,6,0,7],gen:'waves',k:2,seed:17},
+ {id:'terrazzo',e:'🪩',name:'Терраццо-хаос',sp:[0,7,3,6,5],gen:'terrazzo',k:2,seed:42},
+ {id:'alien',e:'🌀',name:'Артефакт из другой вселенной',sp:null,gen:'swirl',k:2,seed:7},
+ {id:'night',e:'🌑',name:'Ночная геометрия',sp:[9,0,6],gen:'nested',k:1,seed:2},
+];
+function buildTemplateGrid(t){
+  const d=defaultState();
+  d.grid=new Uint8Array(d.cols*d.rows);
+  const sp=t.sp||(t.sp===null?d.species.map((_,i)=>i):[0,7]);
+  const rnd=mulberry32(t.seed*7919+13);
+  GEN[t.gen].fn((r,c,si)=>{d.grid[r*d.cols+c]=sp[pmod(si,sp.length)]},d.cols,d.rows,t.k,rnd,sp.length);
+  return d;
+}
+function applyTemplate(t){
+  pushHistory();
+  const d=buildTemplateGrid(t);
+  S.grid=d.grid;S.cols=d.cols;S.rows=d.rows;
+  if(t.sp)S.species.forEach((sp,i)=>sp.on=t.sp.includes(i));
+  layoutCanvas();refreshAll();
+  toast(`Шаблон «${t.name}» применён. ${rnd(QUOTES)}`);
+}
+
+/* ================= 2D view / zoom (FIXED) =================
+   База: view.ppm — масштаб «вписать в контейнер», считается ТОЛЬКО
+   при изменении размеров сетки/окна. Зум лишь умножает CSS-размер
+   и буфер, а затем перецентрирует скролл — макет не улетает. */
+const view={ppm:4,dpr:1};
+function layoutCanvas(){
+  const wrap=$('#canvasWrap');
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell;
+  const availW=(wrap.clientWidth||600)-44, availH=(wrap.clientHeight||480)-44;
+  const avail=Math.max(160,Math.min(availW,availH));
+  view.ppm=avail/Math.max(Lmm,Wmm);
+  view.dpr=Math.min(2,window.devicePixelRatio||1);
+  applyZoom(true);
+}
+function applyZoom(recenter=true){
+  const wrap=$('#canvasWrap');
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell;
+  const cssW=Math.max(2,Lmm*view.ppm),cssH=Math.max(2,Wmm*view.ppm);
+  const dpr=view.dpr||1;
+  let bw=Math.round(cssW*zoom*dpr),bh=Math.round(cssH*zoom*dpr);
+  const cap=3600;
+  if(Math.max(bw,bh)>cap){const k=cap/Math.max(bw,bh);bw=Math.max(2,Math.round(bw*k));bh=Math.max(2,Math.round(bh*k))}
+  for(const cv of [$('#boardCv'),$('#ovCv')]){
+    cv.width=bw;cv.height=bh;
+    cv.style.width=(cssW*zoom)+'px';
+    cv.style.height=(cssH*zoom)+'px';
+  }
+  render();drawOverlay();
+  if(recenter){
+    // держим центр макета в центре вьюпорта при любом зуме
+    requestAnimationFrame(()=>{
+      wrap.scrollLeft=Math.max(0,(cssW*zoom-wrap.clientWidth)/2);
+      wrap.scrollTop=Math.max(0,(cssH*zoom-wrap.clientHeight)/2);
+    });
+  }
+}
+function roundRectPath(ctx,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();
+}
+function renderPattern(ctx,Wpx,Hpx,ppm,withTex){
+  const rad=Math.min(12*ppm,Math.min(Wpx,Hpx)*0.12);
+  ctx.save();roundRectPath(ctx,0,0,Wpx,Hpx,rad);ctx.clip();
+  ctx.fillStyle='#170f07';ctx.fillRect(0,0,Wpx,Hpx);
+  const jpx=Math.max(ppm>=3?1:0.6,0.35*S.cell*ppm*0.08);
+  const cw=S.cell*ppm;
+  for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++){
+    const sp=S.species[S.grid[gi(c,r)]]||S.species[0];
+    const jit=((hash2(c,r,7)%100)/100-0.5)*0.13;
+    ctx.fillStyle=shade(sp.c,jit);
+    ctx.fillRect(c*cw+jpx/2,r*cw+jpx/2,cw-jpx,cw-jpx);
+    if(withTex&&ppm>=2.2){
+      const rnd=mulberry32(hash2(c,r,99));
+      const cx=c*cw+cw*(0.28+rnd()*0.44),cy=r*cw+cw*(0.28+rnd()*0.44);
+      const n=3+Math.floor(rnd()*3),maxR=cw*0.72;
+      ctx.save();ctx.beginPath();ctx.rect(c*cw+jpx/2,r*cw+jpx/2,cw-jpx,cw-jpx);ctx.clip();
+      ctx.strokeStyle=sp.ring;
+      for(let i=1;i<=n;i++){
+        const rr=maxR*(0.22+0.78*i/n);
+        ctx.globalAlpha=0.16+rnd()*0.16;
+        ctx.lineWidth=Math.max(0.5,ppm*0.16*(0.6+rnd()));
+        ctx.beginPath();
+        ctx.ellipse(cx,cy,rr*(0.72+rnd()*0.3),rr,rnd()*Math.PI,0,Math.PI*2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha=1;ctx.restore();
+    }
+  }
+  const gr=ctx.createLinearGradient(0,0,0,Hpx*0.5);
+  gr.addColorStop(0,'rgba(255,240,210,0.10)');gr.addColorStop(1,'rgba(255,240,210,0)');
+  ctx.fillStyle=gr;ctx.fillRect(0,0,Wpx,Hpx*0.5);
+  ctx.restore();
+  roundRectPath(ctx,1,1,Wpx-2,Hpx-2,rad);
+  ctx.strokeStyle='rgba(0,0,0,0.6)';ctx.lineWidth=2;ctx.stroke();
+}
+function render(){
+  const cv=$('#boardCv');const ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+  const ppm=cv.width/(S.cols*S.cell);
+  renderPattern(ctx,cv.width,cv.height,ppm,S.texture);
+}
+let hoverCell=null;
+function drawOverlay(){
+  const cv=$('#ovCv');const ctx=cv.getContext('2d');
+  ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,cv.width,cv.height);
+  if(!hoverCell)return;
+  const ppm=cv.width/(S.cols*S.cell),cw=S.cell*ppm;
+  const list=[[hoverCell.c,hoverCell.r]];
+  if(symMode===1||symMode===3)list.push([S.cols-1-hoverCell.c,hoverCell.r]);
+  if(symMode===2||symMode===3)list.push([hoverCell.c,S.rows-1-hoverCell.r]);
+  if(symMode===3)list.push([S.cols-1-hoverCell.c,S.rows-1-hoverCell.r]);
+  list.forEach(([c,r],i)=>{
+    ctx.fillStyle=i===0?'rgba(232,163,61,0.3)':'rgba(232,163,61,0.14)';
+    ctx.strokeStyle=i===0?'#e8a33d':'rgba(232,163,61,0.5)';
+    ctx.lineWidth=Math.max(1.5,view.dpr);
+    ctx.fillRect(c*cw,r*cw,cw,cw);ctx.strokeRect(c*cw+1,r*cw+1,cw-2,cw-2);
+  });
+}
+
+/* ================= pointer ================= */
+let painting=false,lastCell=null;
+function eventCell(e){
+  const cv=$('#boardCv'),rect=cv.getBoundingClientRect();
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell;
+  const x=(e.clientX-rect.left)/rect.width*Lmm;
+  const y=(e.clientY-rect.top)/rect.height*Wmm;
+  if(x<0||y<0||x>=Lmm||y>=Wmm)return null;
+  return{c:clamp(Math.floor(x/S.cell),0,S.cols-1),r:clamp(Math.floor(y/S.cell),0,S.rows-1)};
+}
+function paintLine(a,b,s){
+  const steps=Math.max(Math.abs(a.c-b.c),Math.abs(a.r-b.r),1);
+  for(let i=0;i<=steps;i++){
+    const c=Math.round(a.c+(b.c-a.c)*i/steps),r=Math.round(a.r+(b.r-a.r)*i/steps);
+    setCellSafe(c,r,s);
+  }
+}
+function onPointerDown(e){
+  const cell=eventCell(e);if(!cell)return;
+  e.preventDefault();
+  if(e.button===2){curSpecies=S.grid[gi(cell.c,cell.r)];buildChips();return}
+  if(curTool==='pick'){curSpecies=S.grid[gi(cell.c,cell.r)];buildChips();return}
+  pushHistory();
+  if(curTool==='fill'){floodFill(cell.c,cell.r,curSpecies);render();return}
+  painting=true;lastCell=cell;
+  try{ov.setPointerCapture(e.pointerId)}catch(err){}
+  setCellSafe(cell.c,cell.r,curSpecies);render();
+}
+const ov=$('#ovCv');
+function onPointerMove(e){
+  const cell=eventCell(e);
+  hoverCell=cell;drawOverlay();
+  if(cell){const sp=S.species[S.grid[gi(cell.c,cell.r)]];$('#stCell').textContent=`клетка ${cell.c+1}×${cell.r+1} · ${sp.n}`}
+  if(!painting||!cell)return;
+  paintLine(lastCell,cell,curSpecies);lastCell=cell;render();
+}
+function endStroke(){
+  if(painting){painting=false;lastCell=null;refreshAll()}
+}
+
+/* ================= analysis ================= */
+function packRects(parts,stock,kerf){
+  const L=stock.len,W=stock.width,K=kerf;
+  const sorted=[...parts].sort((a,b)=>b.l-a.l);
+  const boards=[],bad=[];
+  let cur=null;
+  const fits=(l,w)=>l<=L-2*K&&w<=W-2*K;
+  for(const p of sorted){
+    let l=p.l,w=p.w;
+    if(!fits(l,w)){if(fits(w,l)){[l,w]=[w,l]}else{bad.push(p);continue}}
+    let placed=false;
+    if(cur&&cur.x+l<=L-K&&cur.y+w<=W-K){
+      cur.placed.push({x:cur.x,y:cur.y,l,w});cur.x+=l+K;cur.shelfH=Math.max(cur.shelfH,w);placed=true;
+    }else if(cur){
+      const ny=cur.y+cur.shelfH+K;
+      if(ny+w<=W-K&&K+l<=L-K){cur.placed.push({x:K,y:ny,l,w});cur.x=K+l+K;cur.y=ny;cur.shelfH=w;placed=true}
+    }
+    if(!placed){
+      cur={placed:[],x:K,y:K,shelfH:0};boards.push(cur);
+      if(K+l<=L-K&&K+w<=W-K){cur.placed.push({x:K,y:K,l,w});cur.x=K+l+K;cur.shelfH=w;placed=true}
+    }
+    if(!placed)bad.push(p);
+  }
+  return{boards,bad};
+}
+let CACHE=null;
+function analyze(){
+  const runs=[];const per=S.species.map(()=>({blocks:0,parts:0,rects:[]}));
+  let parts=0,maxLen=0;
+  for(let r=0;r<S.rows;r++){
+    let c=0;
+    while(c<S.cols){
+      const s=S.grid[gi(c,r)];let c2=c;
+      while(c2<S.cols&&S.grid[gi(c2,r)]===s)c2++;
+      const len=c2-c;
+      runs.push({r,c,s,len});
+      per[s].blocks+=len;per[s].parts++;per[s].rects.push({l:len*S.cell,w:S.cell});
+      parts+=len;maxLen=Math.max(maxLen,len);
+      c=c2;
+    }
+  }
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell,T=S.thickness;
+  const cellM3=(S.cell/1000)**2*(T/1000);
+  const stockM3=S.stock.len*S.stock.width*S.stock.thick/1e9;
+  const usedSpecies=[...new Set(S.grid)].filter(i=>S.species[i]);
+  let cost=0,stockBoards=0,stockVolTotal=0;
+  per.forEach((p,i)=>{
+    p.volNet=p.blocks*cellM3;
+    p.volBuy=p.volNet*(1+S.waste/100);
+    p.weight=p.volNet*(S.species[i].d||600);
+    p.pack=null;p.cost=0;p.boards=0;p.infeasible=false;
+    if(p.blocks>0){
+      p.pack=packRects(p.rects,S.stock,S.kerf);
+      p.boards=p.pack.boards.length;
+      if(p.pack.bad.length){
+        p.infeasible=true;
+        p.cost=p.volBuy*S.species[i].p*1.15;
+      }else{
+        p.cost=p.boards*stockM3*S.species[i].p;
+      }
+      cost+=p.cost;stockBoards+=p.boards;stockVolTotal+=p.boards*stockM3;
+    }
+  });
+  const netVol=parts*cellM3;
+  const wastePct=stockVolTotal>0?Math.max(0,(1-netVol/stockVolTotal)*100):null;
+  const weight=per.reduce((a,p)=>a+p.weight,0);
+  const areaDm2=Lmm*Wmm/10000;
+  const dryMin=(S.rows+1)*120;
+  const workMin=Math.round(parts*1.4+stockBoards*6+(S.rows+1)*30+areaDm2*4+45);
+  return{runs,per,parts,maxLen,Lmm,Wmm,T,cellM3,stockM3,cost,stockBoards,stockVolTotal,netVol,wastePct,weight,usedSpecies,workMin,dryMin,areaDm2};
+}
+function checkList(A){
+  const out=[];const push=(t,m)=>out.push({t,m});
+  if(S.cell<6)push('err',`Клетка ${S.cell} мм — мельче 6 мм: резать и клеить такое почти нереально.`);
+  else if(S.cell<12)push('warn',`Клетка ${S.cell} мм — мелко: нужна очень точная торцовка и аккуратная склейка.`);
+  else push('ok',`Размер клетки ${S.cell} мм — комфортный для работы.`);
+  if(S.thickness<12)push('err','Толщина меньше 12 мм — торцевая доска развалится.');
+  else if(S.thickness<20)push('warn','Тонковато для торцевой: рекомендуем ≥ 25 мм.');
+  else if(S.thickness>80)push('warn','Очень толстая доска: тяжёлая, и клей при склейке будет греться долго.');
+  else push('ok',`Толщина ${S.thickness} мм — золотая середина.`);
+  const maxPart=A.maxLen*S.cell;
+  if(maxPart>S.stock.len)push('err',`Самая длинная деталь ${maxPart} мм не помещается в заготовку ${S.stock.len} мм.`);
+  else push('ok',`Все детали влезают в заготовку по длине (макс. ${maxPart} мм).`);
+  if(S.cell>S.stock.width)push('err','Клетка шире заготовки — детали не вырезать.');
+  if(S.stock.thick<S.thickness+3)push('err',`Черновая доска ${S.stock.thick} мм тоньше требуемых ${S.thickness+3} мм (толщина + запас на обработку).`);
+  else push('ok','Толщина черновой заготовки достаточна (с запасом на фугование/рейсмус).');
+  if(A.parts>1500)push('warn',`${A.parts} деталей — это подвиг. Рассмотрите укрупнение клеток.`);
+  if(A.weight>20)push('warn',`Доска ~${A.weight.toFixed(1)} кг — заносить в кухню лучше вдвоём.`);
+  if(A.usedSpecies.length>6)push('warn','Больше 6 пород: замучаетесь перенастраивать станок.');
+  const dis=A.usedSpecies.filter(i=>!S.species[i].on);
+  if(dis.length)push('warn','В узоре используется выключенная порода (проверьте вкладку «Дерево»).');
+  if(A.Wmm>600)push('warn','Широкая финальная склейка — нужна идеально ровная станина.');
+  if(!out.some(o=>o.t==='err'))out.push({t:'ok',m:'🎉 Физически реализуемо. Можно пилить!'});
+  return out;
+}
+
+/* ================= fmt ================= */
+const fmtLen=mm=>S.unit==='mm'?`${nf.format(Math.round(mm*10)/10)} мм`:`${(mm/25.4).toFixed(2)}″`;
+const fmtVol=m3=>`${(m3*1000).toFixed(1)} л`;
+
+/* ================= right panel renders ================= */
+function renderViewStats(A){
+  const st=[
+    ['Габариты Д×Ш×Т',`${fmtLen(A.Lmm)} × ${fmtLen(A.Wmm)} × ${fmtLen(A.T)}`],
+    ['Площадь верха',`${A.areaDm2.toFixed(1)} дм²`],
+    ['Объём древесины',fmtVol(A.netVol)],
+    ['Масса доски',`~${A.weight.toFixed(1)} кг`],
+    ['Клеток / деталей',`${S.cols}×${S.rows} = ${S.cols*S.rows} / ${A.parts}`],
+    ['Этапов склейки',`${S.rows} рядов + 1 сборка`],
+    ['Заготовок на распил',`${A.stockBoards} шт`],
+    ['Время работы',`≈ ${(A.workMin/60).toFixed(1)} ч + ${(A.dryMin/60).toFixed(0)} ч сушки`],
+  ];
+  $('#viewStats').innerHTML=st.map(([k,v])=>`<div class="stat"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+}
+function renderParts(A){
+  let rows='';
+  S.species.forEach((sp,i)=>{
+    const p=A.per[i];if(!p||p.blocks===0)return;
+    rows+=`<tr><td><span class="sw" style="background:${sp.c}"></span>${sp.n}</td>
+      <td>${p.parts}</td><td>${p.blocks}</td><td>${fmtVol(p.volNet)}</td><td>${p.weight.toFixed(1)} кг</td></tr>`;
+  });
+  const totParts=A.per.reduce((a,p)=>a+(p.blocks?p.parts:0),0);
+  $('#partsTable').innerHTML=`<table class="mini"><thead><tr><th>Порода</th><th>Ламелей</th><th>Блоков</th><th>Объём</th><th>Масса</th></tr></thead><tbody>${rows}
+    <tr class="total"><td>Итого</td><td>${totParts}</td><td>${A.parts}</td><td>${fmtVol(A.netVol)}</td><td>${A.weight.toFixed(1)} кг</td></tr></tbody></table>`;
+  const byRow=[];for(let r=0;r<S.rows;r++)byRow.push(A.runs.filter(x=>x.r===r));
+  let html='';
+  byRow.forEach((runs,r)=>{
+    if(r===10&&S.rows>14){html+=`<div class="glue-step"><div class="gs-head">… и ещё ${S.rows-10} рядов по той же схеме …</div></div>`;return}
+    if(r>10&&S.rows>14)return;
+    const segs=runs.map(x=>{
+      const sp=S.species[x.s];
+      return `<i style="flex:${x.len};background:${sp.c}" title="${sp.n} ×${x.len} (${x.len*S.cell} мм)"></i>`;
+    }).join('');
+    html+=`<div class="glue-step"><div class="gs-head">Этап ${r+1} · Ряд ${r+1} — ламель ${fmtLen(A.Lmm)}</div>
+      <div class="gs-bar">${segs}</div>
+      <div class="gs-meta">деталей: ${runs.length} · стянуть вдоль, струбцин: 2 · сушка ~2 ч</div></div>`;
+  });
+  const clamps=Math.max(4,Math.ceil(A.Wmm/150));
+  html+=`<div class="glue-step"><div class="gs-head">Финал · Сборка щита</div>
+    <div class="gs-meta">Склеить ${S.rows} ламелей в щит ${fmtLen(A.Lmm)} × ${fmtLen(A.Wmm)}.<br>
+    Струбцин: ≥ ${clamps} через каждые ~150 мм. Проверить плоскостность правилом, выступивший клей снять после желатинизации.<br>
+    Затем: фрезер по периметру, шлифовка 80→120→180, масло/воск в 3 слоя.</div></div>`;
+  $('#glueList').innerHTML=html;
+}
+function svgBoard(pack,color,stock){
+  const L=stock.len,W=stock.width;
+  let out='';const shown=pack.boards.slice(0,2);
+  shown.forEach(b=>{
+    let inn=`<rect x="0" y="0" width="${L}" height="${W}" fill="#241a10" stroke="#3a2f20" stroke-width="${W*0.02}"/>`;
+    for(const p of b.placed){
+      inn+=`<rect x="${p.x}" y="${p.y}" width="${p.l}" height="${p.w}" fill="${color}" stroke="rgba(0,0,0,.45)" stroke-width="${W*0.012}"><title>${p.l}×${p.w} мм</title></rect>`;
+    }
+    out+=`<svg viewBox="-2 -2 ${L+4} ${W+4}" style="height:${clamp(9000/L,26,70)}px" preserveAspectRatio="xMidYMid meet">${inn}</svg>`;
+  });
+  return out;
+}
+function renderCut(A){
+  $('#cutHint').innerHTML=`Заготовка: ${fmtLen(S.stock.len)} × ${fmtLen(S.stock.width)} × ${fmtLen(S.stock.thick)} · пропил ${S.kerf} мм. Наведите на деталь — размер.`;
+  let html='';
+  S.species.forEach((sp,i)=>{
+    const p=A.per[i];if(!p||p.blocks===0)return;
+    if(p.infeasible){
+      html+=`<div class="pack-card"><div class="pc-head"><span><span class="sw" style="background:${sp.c}"></span>${sp.n}</span><small style="color:var(--err)">🚫 есть детали длиннее заготовки</small></div></div>`;
+      return;
+    }
+    const areaUse=p.pack.boards.length?Math.round(p.rects.reduce((a,r)=>a+r.l*r.w,0)/(p.pack.boards.length*S.stock.len*S.stock.width)*100):0;
+    html+=`<div class="pack-card"><div class="pc-head">
+      <span><span class="sw" style="background:${sp.c}"></span>${sp.n} — ${p.pack.boards.length} заготовок</span>
+      <small>использование ~${areaUse}% · отход ~${100-areaUse}%</small></div>
+      ${svgBoard(p.pack,sp.c,S.stock)}
+      ${p.pack.boards.length>2?`<div class="pack-more">+ ещё ${p.pack.boards.length-2} заготовок с той же раскладкой</div>`:''}
+    </div>`;
+  });
+  $('#cutList').innerHTML=html||'<div class="hint">Пусто.</div>';
+}
+function renderCost(A){
+  let rows='';
+  S.species.forEach((sp,i)=>{
+    const p=A.per[i];if(!p||p.blocks===0)return;
+    rows+=`<tr><td><span class="sw" style="background:${sp.c}"></span>${sp.n}</td>
+      <td>${p.blocks}</td><td>${fmtVol(p.volBuy)}</td><td>${p.infeasible?'—':p.boards}</td>
+      <td>${nf.format(sp.p)}</td><td>${fmtRub(p.cost)}</td></tr>`;
+  });
+  $('#costTable').innerHTML=`<table class="mini"><thead><tr><th>Порода</th><th>Блоков</th><th>Купить (с запасом)</th><th>Заготовок</th><th>₽/м³</th><th>Сумма</th></tr></thead>
+    <tbody>${rows}<tr class="total"><td>Итого</td><td>${A.parts}</td><td>${fmtVol(A.per.reduce((a,p)=>a+p.volBuy,0))}</td><td>${A.stockBoards}</td><td></td><td>${fmtRub(A.cost)}</td></tr></tbody></table>`;
+  const perDm=A.cost/Math.max(1,A.areaDm2);
+  $('#costStats').innerHTML=`
+    <div class="stat"><div class="k">Себестоимость материала</div><div class="v">${fmtRub(A.cost)}</div></div>
+    <div class="stat"><div class="k">За 1 дм² верха</div><div class="v">${fmtRub(perDm)}</div></div>
+    <div class="stat"><div class="k">Отход при раскрое</div><div class="v">${A.wastePct==null?'—':A.wastePct.toFixed(0)+' %'}</div></div>
+    <div class="stat"><div class="k">Клей ПВА (≈150 г/м²)</div><div class="v">~${(A.areaDm2*0.15).toFixed(1)} кг</div></div>`;
+  $('#funLine').textContent=`${rnd(QUOTES)} На эти деньги можно купить ${Math.max(1,Math.round(A.cost/180))} бутылок клея… или одну такую доску у конкурента.`;
+}
+function renderChecks(A){
+  const list=checkList(A);
+  const icon={ok:'✅',warn:'⚠️',err:'🚫'};
+  $('#checkList').innerHTML=list.map(o=>`<div class="chk ${o.t}"><span>${icon[o.t]}</span><span>${o.m}</span></div>`).join('');
+}
+
+/* ================= species UI ================= */
+function buildChips(){
+  const box=$('#spChips');box.innerHTML='';
+  S.species.forEach((sp,i)=>{
+    if(!sp.on)return;
+    const d=document.createElement('div');
+    d.className='chip'+(i===curSpecies?' on':'');
+    d.style.background=`linear-gradient(160deg, ${shade(sp.c,0.12)}, ${sp.c} 55%, ${shade(sp.c,-0.15)})`;
+    d.title=sp.n;
+    d.onclick=()=>{curSpecies=i;buildChips()};
+    box.appendChild(d);
+  });
+}
+function buildSpeciesEditor(){
+  const box=$('#spEditor');box.innerHTML='';
+  S.species.forEach((sp,i)=>{
+    const row=document.createElement('div');
+    row.className='sp-row'+(sp.on?'':' off');
+    row.innerHTML=`
+      <input type="color" value="${sp.c}" data-f="c" title="Цвет">
+      <div><input type="text" value="${sp.n}" data-f="n" style="padding:2px 4px">
+        <span class="sp-cap">кольца: ${sp.ring}</span></div>
+      <input type="number" value="${sp.d}" data-f="d" min="100" max="1300" title="Плотность кг/м³">
+      <input type="number" value="${sp.p}" data-f="p" min="0" step="1000" title="Цена ₽/м³">
+      <button class="btn icobtn" data-act="eye" title="Вкл/выкл для генераторов" style="font-size:13px">${sp.on?'👁':'🚫'}</button>
+      <button class="btn icobtn" data-act="del" title="Удалить" style="font-size:12px">✕</button>`;
+    row.querySelectorAll('input').forEach(inp=>{
+      inp.addEventListener('change',()=>{
+        const f=inp.dataset.f;
+        if(f==='n')sp.n=inp.value||'Порода';
+        if(f==='c'){sp.c=inp.value;sp.ring=shade(inp.value,-0.32)}
+        if(f==='d')sp.d=clamp(+inp.value||600,100,1300);
+        if(f==='p')sp.p=Math.max(0,+inp.value||0);
+        refreshAll();
+      });
+    });
+    row.querySelector('[data-act=eye]').onclick=()=>{sp.on=!sp.on;refreshAll()};
+    row.querySelector('[data-act=del]').onclick=()=>{
+      if(S.grid.includes(i)){toast('Порода используется в узоре — сначала перекрасьте клетки');return}
+      if(S.species.length<=2){toast('Минимум 2 породы');return}
+      pushHistory();
+      S.grid.forEach((v,k)=>{if(v>i)S.grid[k]=v-1});
+      S.species.splice(i,1);
+      if(curSpecies>=S.species.length)curSpecies=0;
+      refreshAll();
+    };
+    box.appendChild(row);
+  });
+}
+function buildTplThumbs(){
+  const box=$('#tplGrid');box.innerHTML='';
+  TEMPLATES.forEach(t=>{
+    const d=buildTemplateGrid(t);
+    const el=document.createElement('div');el.className='tpl';
+    const cv=document.createElement('canvas');cv.width=160;cv.height=100;
+    el.appendChild(cv);
+    const cap=document.createElement('div');cap.textContent=`${t.e} ${t.name}`;el.appendChild(cap);
+    el.onclick=()=>applyTemplate(t);
+    box.appendChild(el);
+    const ctx=cv.getContext('2d');
+    const ppm=160/(d.cols*d.cell);
+    const saveG={grid:S.grid,cols:S.cols,rows:S.rows};
+    S.grid=d.grid;S.cols=d.cols;S.rows=d.rows;
+    ctx.fillStyle='#170f07';ctx.fillRect(0,0,160,100);
+    renderPattern(ctx,160,d.rows*d.cell*ppm,ppm,false);
+    S.grid=saveG.grid;S.cols=saveG.cols;S.rows=saveG.rows;
+  });
+}
+
+/* ================= board inputs ================= */
+function syncBoardInputs(){
+  $('#inCols').value=S.cols;$('#inRows').value=S.rows;
+  $('#inCell').value=S.cell;$('#inThick').value=S.thickness;$('#inKerf').value=S.kerf;
+  $('#stLen').value=S.stock.len;$('#stWid').value=S.stock.width;$('#stThk').value=S.stock.thick;
+  $('#inWaste').value=S.waste;$('#inUnit').value=S.unit;$('#inTexture').checked=S.texture;
+  $('#projName').value=S.name;
+}
+function wireBoardInputs(){
+  $('#inCols').addEventListener('change',e=>{const v=clamp(Math.round(+e.target.value||16),2,40);pushHistory();resizeGrid(v,S.rows);layoutCanvas();refreshAll()});
+  $('#inRows').addEventListener('change',e=>{const v=clamp(Math.round(+e.target.value||10),2,40);pushHistory();resizeGrid(S.cols,v);layoutCanvas();refreshAll()});
+  $('#inCell').addEventListener('change',e=>{S.cell=clamp(+e.target.value||30,5,150);layoutCanvas();refreshAll()});
+  $('#inThick').addEventListener('change',e=>{S.thickness=clamp(+e.target.value||36,10,120);refreshAll()});
+  $('#inKerf').addEventListener('change',e=>{S.kerf=clamp(+e.target.value||0,0,6);refreshAll()});
+  $('#stLen').addEventListener('change',e=>{S.stock.len=clamp(+e.target.value||2000,100,6000);refreshAll()});
+  $('#stWid').addEventListener('change',e=>{S.stock.width=clamp(+e.target.value||160,20,1000);refreshAll()});
+  $('#stThk').addEventListener('change',e=>{S.stock.thick=clamp(+e.target.value||50,10,200);refreshAll()});
+  $('#inWaste').addEventListener('change',e=>{S.waste=clamp(+e.target.value||0,0,80);refreshAll()});
+  $('#inUnit').addEventListener('change',e=>{S.unit=e.target.value;refreshAll()});
+  $('#inTexture').addEventListener('change',e=>{S.texture=e.target.checked;render()});
+  $('#projName').addEventListener('input',e=>{S.name=e.target.value;autosave()});
+}
+
+/* ================= 3D ================= */
+let T3=null,expl3D=0,scheduleTimer=null;
+function schedule3D(){clearTimeout(scheduleTimer);scheduleTimer=setTimeout(buildBoard3D,140)}
+async function init3D(){
+  try{
+    const THREE=await import('three');
+    const {OrbitControls}=await import('three/addons/controls/OrbitControls.js');
+    const host=$('#gl3d');host.innerHTML='';
+    const renderer=new THREE.WebGLRenderer({antialias:true});
+    renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+    renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace=THREE.SRGBColorSpace;
+    host.appendChild(renderer.domElement);
+    const scene=new THREE.Scene();
+    scene.background=new THREE.Color(0x171310);
+    scene.fog=new THREE.Fog(0x171310,30,80);
+    const camera=new THREE.PerspectiveCamera(38,1,0.1,200);
+    const hemi=new THREE.HemisphereLight(0xfff1dc,0x241509,1.0);scene.add(hemi);
+    const dir=new THREE.DirectionalLight(0xffe6c0,2.2);
+    dir.castShadow=true;dir.shadow.mapSize.set(1024,1024);
+    dir.shadow.camera.left=-15;dir.shadow.camera.right=15;dir.shadow.camera.top=15;dir.shadow.camera.bottom=-15;
+    scene.add(dir);
+    const fill=new THREE.DirectionalLight(0xbcd4ff,0.4);fill.position.set(-8,4,-6);scene.add(fill);
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(120,120),new THREE.ShadowMaterial({opacity:0.35}));
+    ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;scene.add(ground);
+    const controls=new OrbitControls(camera,renderer.domElement);
+    controls.enableDamping=true;controls.autoRotate=true;controls.autoRotateSpeed=0.9;controls.maxPolarAngle=Math.PI/2-0.03;
+    T3={THREE,scene,camera,renderer,controls,dir,group:null,meshes:[]};
+    new ResizeObserver(()=>{
+      const w=host.clientWidth,h=host.clientHeight;
+      if(w>0&&h>0){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix()}
+    }).observe(host);
+    renderer.setAnimationLoop(()=>{controls.update();renderer.render(scene,camera)});
+    buildBoard3D();
+  }catch(err){
+    $('#gl3d').innerHTML='<div class="err3d">🧊 3D недоступно (нужен интернет для загрузки three.js или WebGL)</div>';
+  }
+}
+function buildBoard3D(){
+  if(!T3)return;
+  const {THREE,scene,camera,controls,dir}=T3;
+  if(T3.group){scene.remove(T3.group);T3.meshes.forEach(m=>{m.geometry.dispose();m.material.dispose()});T3.meshes=[];}
+  const SC=0.02;
+  const g=new THREE.Group();
+  const cw=S.cell*SC,tw=S.thickness*SC;
+  const by=new Map();
+  for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++){
+    const s=S.grid[gi(c,r)];if(!by.has(s))by.set(s,[]);by.get(s).push([c,r]);
+  }
+  const box=new THREE.BoxGeometry(cw*0.96,tw,cw*0.96);
+  const dummy=new THREE.Object3D(),col=new THREE.Color();
+  by.forEach((cells,s)=>{
+    const sp=S.species[s];if(!sp)return;
+    const mat=new THREE.MeshStandardMaterial({color:0xffffff,roughness:0.62,metalness:0});
+    mat.needsUpdate=true;
+    const mesh=new THREE.InstancedMesh(box,mat,cells.length);
+    mesh.castShadow=true;mesh.receiveShadow=true;
+    mesh.userData.cells=cells;
+    const base=new THREE.Color(sp.c);
+    cells.forEach(([c,r],i)=>{
+      const j=((hash2(c,r,5)%100)/100-0.5)*0.16;
+      col.copy(base);col.offsetHSL(0,0,j*0.5);
+      mesh.setColorAt(i,col);
+      dummy.position.set((c-(S.cols-1)/2)*cw,tw/2,(r-(S.rows-1)/2)*cw);
+      dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
+    });
+    if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+    g.add(mesh);T3.meshes.push(mesh);
+  });
+  T3.group=g;scene.add(g);
+  const span=Math.max(S.cols,S.rows)*cw;
+  dir.position.set(span*0.8,span*1.3,span*0.5);
+  camera.position.set(span*0.9,span*0.85,span*1.25);
+  controls.target.set(0,tw/2,0);
+  applyExplode();
+}
+function applyExplode(){
+  if(!T3||!T3.group)return;
+  const SC=0.02;
+  const cw=S.cell*SC,tw=S.thickness*SC;
+  const dummy=new THREE.Object3D();
+  T3.meshes.forEach(mesh=>{
+    mesh.userData.cells.forEach(([c,r],i)=>{
+      dummy.position.set((c-(S.cols-1)/2)*cw,tw/2+expl3D*(S.rows-1-r)*cw*1.25,(r-(S.rows-1)/2)*cw*(1+expl3D*0.35));
+      dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate=true;
+  });
+}
+
+/* ================= refresh ================= */
+function refreshViews(){
+  render();drawOverlay();
+  const L=S.cols*S.cell,W=S.rows*S.cell;
+  $('#stDims').textContent=`доска ${fmtLen(L)} × ${fmtLen(W)} × ${fmtLen(S.thickness)} · клетка ${fmtLen(S.cell)}`;
+}
+function refreshAll(){
+  refreshViews();
+  CACHE=analyze();
+  $('#stParts').textContent=`деталей: ${CACHE.parts} · пород: ${CACHE.usedSpecies.length}`;
+  renderViewStats(CACHE);renderParts(CACHE);renderCut(CACHE);renderCost(CACHE);renderChecks(CACHE);
+  buildChips();buildSpeciesEditor();syncBoardInputs();
+  schedule3D();autosave();
+}
+
+/* ================= exports ================= */
+function renderExportCanvas(ppm,caption){
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell;
+  const pad=Math.round(6*ppm);
+  const capH=caption?Math.round(12*ppm):0;
+  const cv=document.createElement('canvas');
+  cv.width=Math.round(Lmm*ppm+pad*2);cv.height=Math.round(Wmm*ppm+pad*2+capH);
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#f6efe2';ctx.fillRect(0,0,cv.width,cv.height);
+  ctx.translate(pad,pad);
+  renderPattern(ctx,Lmm*ppm,Wmm*ppm,ppm,true);
+  ctx.setTransform(1,0,0,1,0,0);
+  if(caption){
+    ctx.fillStyle='#241a10';
+    ctx.font=`700 ${Math.round(4.5*ppm)}px Manrope, sans-serif`;
+    ctx.fillText(`${S.name} · ${Math.round(Lmm)}×${Math.round(Wmm)}×${S.thickness} мм · ТОРЦЕГРАММА`,pad,cv.height-capH/1.6);
+  }
+  return cv;
+}
+function exportPNG(){
+  const Lmm=S.cols*S.cell,Wmm=S.rows*S.cell;
+  const ppm=clamp(Math.floor(3000/Math.max(Lmm,Wmm)),4,24);
+  const cv=renderExportCanvas(ppm,true);
+  const a=document.createElement('a');
+  a.download=(S.name||'doska').replace(/[^\wа-яё№ -]/gi,'')+'.png';
+  a.href=cv.toDataURL('image/png');a.click();
+  toast('PNG сохранён. Красота! 🖼');
+}
+function saveProject(){
+  const blob=new Blob([JSON.stringify(serialize(),null,1)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.download='proekt-torcegramma.json';a.href=URL.createObjectURL(blob);a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+  toast('Проект сохранён в файл 💾');
+}
+function loadProject(file){
+  const rd=new FileReader();
+  rd.onload=()=>{
+    try{
+      const o=JSON.parse(rd.result);
+      if(!o.grid||!o.cols)throw 0;
+      pushHistory();deserialize(o);layoutCanvas();refreshAll();buildTplThumbs();
+      toast('Проект открыт 📂');
+    }catch(e){toast('Файл не похож на проект ТОРЦЕГРАММЫ 🤔')}
+  };
+  rd.readAsText(file);
+}
+function importImage(file){
+  const img=new Image();
+  img.onload=()=>{
+    const cv=document.createElement('canvas');cv.width=S.cols;cv.height=S.rows;
+    const ctx=cv.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+    ctx.drawImage(img,0,0,S.cols,S.rows);
+    const data=ctx.getImageData(0,0,S.cols,S.rows).data;
+    const rgb=S.species.map(sp=>hexToRgb(sp.c));
+    pushHistory();
+    for(let r=0;r<S.rows;r++)for(let c=0;c<S.cols;c++){
+      const i=(r*S.cols+c)*4,R=data[i],G=data[i+1],B=data[i+2];
+      let best=0,bd=1e9;
+      rgb.forEach(([r2,g2,b2],si)=>{
+        const d=(R-r2)**2*0.9+(G-g2)**2*1.2+(B-b2)**2*0.7;
+        if(d<bd){bd=d;best=si}
+      });
+      S.grid[gi(c,r)]=best;
+    }
+    refreshAll();toast('Фото превращено в узор! 🖼→🪵');
+    URL.revokeObjectURL(img.src);
+  };
+  img.src=URL.createObjectURL(file);
+}
+async function printReport(){
+  const A=CACHE||analyze();
+  const ppm=clamp(Math.floor(1600/Math.max(A.Lmm,A.Wmm)),3,14);
+  const img=renderExportCanvas(ppm,false).toDataURL('image/png');
+  const icon={ok:'✅',warn:'⚠️',err:'🚫'};
+  const checks=checkList(A).map(o=>`<div class="note">${icon[o.t]} ${o.m}</div>`).join('');
+  let packHtml='';
+  S.species.forEach((sp,i)=>{
+    const p=A.per[i];if(!p||p.blocks===0||p.infeasible)return;
+    packHtml+=`<div class="avoid"><b>${sp.n}:</b> ${p.boards} заготовок ${S.stock.len}×${S.stock.width}×${S.stock.thick} мм<br>${svgBoard(p.pack,sp.c,S.stock)}</div>`;
+  });
+  const byRow=[];for(let r=0;r<S.rows;r++)byRow.push(A.runs.filter(x=>x.r===r));
+  const glueHtml=byRow.map((runs,r)=>{
+    const det=runs.map(x=>`${S.species[x.s].n}×${x.len} (${x.len*S.cell} мм)`).join(', ');
+    return `<div>Этап ${r+1} · Ряд ${r+1}: ${det} → ламель ${A.Lmm} мм</div>`;
+  }).join('');
+  let matRows='';
+  S.species.forEach((sp,i)=>{
+    const p=A.per[i];if(!p||p.blocks===0)return;
+    matRows+=`<tr><td>${sp.n}</td><td>${p.blocks}</td><td>${(p.volBuy*1000).toFixed(1)} л</td><td>${p.infeasible?'—':p.boards}</td><td>${Math.round(sp.p).toLocaleString('ru-RU')}</td><td>${Math.round(p.cost).toLocaleString('ru-RU')} ₽</td></tr>`;
+  });
+  $('#report').innerHTML=`
+    <h1>🪵 ${S.name}</h1>
+    <div class="rsub">Торцевая разделочная доска · сгенерировано в «ТОРЦЕГРАММЕ» · ${new Date().toLocaleDateString('ru-RU')}</div>
+    <div class="rgrid">
+      <img class="pat" src="${img}" alt="Узор">
+      <div>
+        <h2 style="margin-top:0">1. Размеры</h2>
+        <table><tr><th>Длина</th><td>${Math.round(A.Lmm)} мм</td><th>Ширина</th><td>${Math.round(A.Wmm)} мм</td></tr>
+        <tr><th>Толщина</th><td>${S.thickness} мм</td><th>Клетка</th><td>${S.cell} мм (${S.cols}×${S.rows} шт)</td></tr>
+        <tr><th>Объём / масса</th><td>${(A.netVol*1000).toFixed(1)} л</td><td></td><td>~${A.weight.toFixed(1)} кг</td></tr></table>
+        <h2>2. Проверка</h2>${checks}
+      </div>
+    </div>
+    <h2>3. Материалы</h2>
+    <table><thead><tr><th>Порода</th><th>Блоков</th><th>Купить (с запасом ${S.waste}%)</th><th>Заготовок</th><th>₽/м³</th><th>Сумма</th></tr></thead>
+    <tbody>${matRows}<tr><td><b>Итого</b></td><td><b>${A.parts}</b></td><td></td><td><b>${A.stockBoards}</b></td><td></td><td><b>${Math.round(A.cost).toLocaleString('ru-RU')} ₽</b></td></tr></tbody></table>
+    <div class="note">Заготовка для раскроя: ${S.stock.len}×${S.stock.width}×${S.stock.thick} мм, ширина пропила ${S.kerf} мм. Отход ~${A.wastePct==null?'—':A.wastePct.toFixed(0)+'%'}.</div>
+    <h2>4. Пошаговая склейка</h2>
+    <div class="avoid">${glueHtml}
+    <div><b>Финал:</b> склеить ${S.rows} ламелей в щит ${Math.round(A.Lmm)}×${Math.round(A.Wmm)} мм, струбцин ≥ ${Math.max(4,Math.ceil(A.Wmm/150))}. Сушка каждого этапа ~2 часа.</div>
+    <div>Финиш: фрезеровка периметра, шлифовка 80→120→180, масло для досок в 3 слоя.</div></div>
+    <h2>5. Карта раскроя</h2>${packHtml||'<div class="note">Нет данных.</div>'}
+    <div class="note" style="margin-top:12px">Оценка труда: ≈ ${(A.workMin/60).toFixed(1)} ч работы + ${(A.dryMin/60).toFixed(0)} ч сушки клея. ${rnd(QUOTES)}</div>`;
+  const oldTitle=document.title;
+  document.title='Инструкция — '+S.name;
+  await new Promise(r=>setTimeout(r,120));
+  window.print();
+  setTimeout(()=>document.title=oldTitle,1500);
+}
+
+/* ================= wiring ================= */
+function wireTabs(rootSel){
+  $$(rootSel+' button').forEach(b=>{
+    b.onclick=()=>{
+      $$(rootSel+' button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on');
+      const panes=b.closest('.panel').querySelectorAll('.pane');
+      panes.forEach(p=>p.classList.remove('on'));
+      $('#'+b.dataset.tab).classList.add('on');
+      if(b.dataset.tab==='tView')schedule3D();
+    };
+  });
+}
+function init(){
+  try{
+    const raw=localStorage.getItem(LS_KEY);
+    if(raw){deserialize(JSON.parse(raw))}
+    else{const d=buildTemplateGrid(TEMPLATES.find(t=>t.id==='alien'));S.grid=d.grid;S.cols=d.cols;S.rows=d.rows}
+  }catch(e){const d=buildTemplateGrid(TEMPLATES.find(t=>t.id==='alien'));S.grid=d.grid;S.cols=d.cols;S.rows=d.rows}
+
+  wireTabs('#leftTabs');wireTabs('#rightTabs');
+  wireBoardInputs();
+
+  const sel=$('#genSel');
+  Object.entries(GEN).forEach(([id,g])=>{const o=document.createElement('option');o.value=id;o.textContent=g.name;sel.appendChild(o)});
+  sel.value='swirl';
+  $('#genK').addEventListener('input',e=>$('#genKval').textContent=e.target.value);
+  $('#btnSeed').onclick=()=>{seedVal=1+Math.floor(Math.random()*999);$('#seedVal').textContent='#'+seedVal};
+  $('#btnApplyGen').onclick=()=>applyGen(sel.value,+$('#genK').value,seedVal);
+  $('#btnWild').onclick=()=>{
+    const ids=Object.keys(GEN);
+    sel.value=rnd(ids);seedVal=1+Math.floor(Math.random()*999);
+    $('#genK').value=1+Math.floor(Math.random()*4);$('#genKval').textContent=$('#genK').value;
+    $('#seedVal').textContent='#'+seedVal;
+    applyGen(sel.value,+$('#genK').value,seedVal);
+    toast(rnd(QUOTES));
+  };
+
+  $$('[data-tool]').forEach(b=>b.onclick=()=>{
+    curTool=b.dataset.tool;
+    $$('[data-tool]').forEach(x=>x.classList.toggle('on',x===b));
+  });
+  $('#symSel').onchange=e=>symMode=+e.target.value;
+  $('#btnUndo').onclick=undo;$('#btnRedo').onclick=redo;
+  // зум: только меняем размер и держим центр — никакого пересчёта/сброса
+  $('#zoomR').addEventListener('input',e=>{zoom=+e.target.value;applyZoom(true)});
+
+  $('#trRotL').onclick=()=>transform(rotCCW);
+  $('#trRotR').onclick=()=>transform(rotCW);
+  $('#trFlipH').onclick=()=>transform(flipH);
+  $('#trFlipV').onclick=()=>transform(flipV);
+  $('#trShL').onclick=()=>transform(()=>shiftRows(-1));
+  $('#trShR').onclick=()=>transform(()=>shiftRows(1));
+  $('#trShU').onclick=()=>transform(()=>shiftCols(-1));
+  $('#trShD').onclick=()=>transform(()=>shiftCols(1));
+
+  ov.style.pointerEvents='auto';ov.style.cursor='crosshair';
+  ov.addEventListener('pointerdown',onPointerDown);
+  ov.addEventListener('pointermove',onPointerMove);
+  ov.addEventListener('pointerup',endStroke);
+  ov.addEventListener('pointercancel',endStroke);
+  ov.addEventListener('pointerleave',()=>{hoverCell=null;drawOverlay();$('#stCell').textContent='—'});
+  ov.addEventListener('contextmenu',e=>e.preventDefault());
+
+  $('#chkSpin').onchange=e=>{if(T3)T3.controls.autoRotate=e.target.checked};
+  $('#explodeR').addEventListener('input',e=>{expl3D=+e.target.value;applyExplode()});
+
+  $('#btnNew').onclick=()=>{
+    if(confirm('Начать новый проект? Текущий автосохранён в браузере.')){
+      pushHistory();
+      S=defaultState();
+      const d=buildTemplateGrid(TEMPLATES.find(t=>t.id==='alien'));
+      S.grid=d.grid;S.cols=d.cols;S.rows=d.rows;
+      layoutCanvas();refreshAll();buildTplThumbs();toast('Новый проект. Чистый холст!');
+    }
+  };
+  $('#btnSave').onclick=saveProject;
+  $('#btnOpen').onclick=()=>$('#fileOpen').click();
+  $('#fileOpen').onchange=e=>{if(e.target.files[0])loadProject(e.target.files[0]);e.target.value=''};
+  $('#btnPng').onclick=exportPNG;
+  $('#btnPrint').onclick=printReport;
+  $('#btnDiceName').onclick=()=>{S.name=genName();$('#projName').value=S.name;autosave();toast('Новое имя для будущего шедевра 🎰')};
+  $('#btnImport').onclick=()=>$('#fileImport').click();
+  $('#fileImport').onchange=e=>{if(e.target.files[0])importImage(e.target.files[0]);e.target.value=''};
+  $('#btnAddSp').onclick=()=>{
+    if(S.species.length>=14){toast('Максимум 14 пород — уже и так радуга');return}
+    const hues=['#a97b4a','#c9a86a','#7d5a3c','#b98c5e','#8f6b4a','#5e4632'];
+    const c=rnd(hues);
+    S.species.push({n:'Новая порода',c,ring:shade(c,-0.32),d:650,p:80000,on:true});
+    refreshAll();
+  };
+
+  window.addEventListener('keydown',e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}
+    if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();return}
+    const k=e.key.toLowerCase();
+    if(k==='b'){curTool='brush';$$('[data-tool]').forEach(x=>x.classList.toggle('on',x.dataset.tool==='brush'))}
+    if(k==='f'){curTool='fill';$$('[data-tool]').forEach(x=>x.classList.toggle('on',x.dataset.tool==='fill'))}
+    if(k==='i'){curTool='pick';$$('[data-tool]').forEach(x=>x.classList.toggle('on',x.dataset.tool==='pick'))}
+  });
+  let resizeTimer=null;
+  window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>layoutCanvas(),120)});
+
+  buildTplThumbs();
+  layoutCanvas();
+  refreshAll();
+  init3D();
+  setTimeout(()=>toast('Добро пожаловать в ТОРЦЕГРАММУ! Кликните 🌀 «Дикий узор» для начала 🪵'),600);
+}
+init();
+</script>
+</body>
+</html>
