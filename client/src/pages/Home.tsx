@@ -1,160 +1,634 @@
-// STYLE: Industrial futurism for a woodworking instrument panel. Dark workbench canvas, ember orange active states, IBM Plex Mono for measurements, Space Grotesk for values.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  ArrowDownToLine, BookOpen, Box, Check, ChevronDown, CircleHelp, Copy, Download,
-  FileText, FlipHorizontal2, FlipVertical2, Grid3X3, Layers3, Maximize2, Minus,
-  PanelLeftClose, PanelLeftOpen, Plus, Printer, Redo2, RotateCcw, RotateCw,
-  Ruler, Save, Scissors, Settings2, Sparkles, SquareDashedMousePointer, Star, Trash2,
-  Undo2, WandSparkles, X, Zap
+  AlertTriangle,
+  Box,
+  Check,
+  Download,
+  FolderOpen,
+  Grid3X3,
+  ImageDown,
+  Maximize2,
+  Minus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Plus,
+  Printer,
+  Save,
+  Scissors,
+  WandSparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
+import {
+  applyTemplate,
+  generateSequence,
+  derive,
+  evaluateChecks,
+  hasRefuse,
+  loadProject,
+  saveProject,
+  downloadProject,
+  parseProject,
+  STORAGE_KEY,
+  formatLength,
+  fromDisplay,
+  toDisplay,
+  syncStrips,
+  TEMPLATES,
+  faceGrid,
+  speciesColor,
+  type Project,
+  type TemplateId,
+  type Unit,
+} from "@/domain";
+import { BoardStage } from "@/components/desk/BoardStage";
+import { Instruction } from "@/components/desk/Instruction";
+import { FacePreview } from "@/components/desk/FacePreview";
 
-const MATERIALS = [
-  { id: "walnut", name: "Walnut", code: "WAL", color: "#6f4735", grain: "#9a6b50", cost: 0.18, texture: "linear", fiberAngle: 18, grainScale: 1.1 },
-  { id: "maple", name: "Maple", code: "MAP", color: "#e4c48f", grain: "#f0dcae", cost: 0.13, texture: "linear", fiberAngle: -12, grainScale: 1 },
-  { id: "cherry", name: "Cherry", code: "CHE", color: "#a75845", grain: "#cf7b59", cost: 0.16, texture: "wave", fiberAngle: 24, grainScale: 1.3 },
-  { id: "ash", name: "Ash", code: "ASH", color: "#c9c2ad", grain: "#e9e0ca", cost: 0.12, texture: "rays", fiberAngle: 0, grainScale: .8 },
-  { id: "padauk", name: "Padauk", code: "PAD", color: "#c85530", grain: "#eb7848", cost: 0.22, texture: "linear", fiberAngle: 35, grainScale: .9 },
-];
-const PATTERNS = [
-  { id: "orbit", name: "ORBITAL", tag: "generated", description: "радиальная орбита", icon: "◌" },
-  { id: "cube", name: "IMPOSSIBLE CUBE", tag: "geometric", description: "невозможный куб", icon: "◇" },
-  { id: "zigzag", name: "SAWTOOTH", tag: "classic", description: "двойной зигзаг", icon: "⌁" },
-  { id: "chaos", name: "CONTROLLED CHAOS", tag: "wild", description: "управляемый хаос", icon: "✳" },
-  { id: "tessellation", name: "TESSELLATION", tag: "tiling", description: "сотовая мозаика", icon: "⬡" },
-  { id: "kaleido", name: "KALEIDOSCOPE", tag: "radial", description: "зеркальная роза", icon: "✥" },
-  { id: "voronoi", name: "CELLULAR FIELD", tag: "organic", description: "живые ячейки", icon: "⌬" },
-  { id: "pinwheel", name: "PINWHEEL", tag: "旋", description: "вращающиеся лопасти", icon: "✣" },
-  { id: "isometric", name: "ISOMETRIC", tag: "architectural", description: "пространственная сетка", icon: "▧" },
-  { id: "checker", name: "КЛАССИКА ШАХМАТ", tag: "classic", description: "равномерный контраст", icon: "♟" },
-  { id: "stripes", name: "МЯСНАЯ ЛАВКА", tag: "stripes", description: "ритм слоёв", icon: "▤" },
-  { id: "diag", name: "ЁЛОЧКА", tag: "diagonal", description: "диагональный срез", icon: "⟋" },
-  { id: "brick", name: "ПЛЕТЁНКА", tag: "weave", description: "кирпичная перевязка", icon: "▦" },
-  { id: "waves", name: "ЗАКАТ НАД ВЕРСТАКОМ", tag: "wave", description: "пульсирующие волны", icon: "≈" },
-  { id: "rings", name: "КОЛЬЦА", tag: "radial", description: "концентрические слои", icon: "◎" },
-  { id: "swirl", name: "АРТЕФАКТ", tag: "alien", description: "вихрь из другой вселенной", icon: "🌀" },
-  { id: "nested", name: "НОЧНАЯ ГЕОМЕТРИЯ", tag: "nested", description: "рамки и контуры", icon: "▣" },
-  { id: "noise", name: "ОРГАНИКА", tag: "organic", description: "мягкое поле шума", icon: "☁" },
-  { id: "terrazzo", name: "ТЕРРАЦЦО-ХАОС", tag: "wild", description: "пятна и осколки", icon: "🪩" },
-  { id: "blocks", name: "СЛУЧАЙНЫЕ БЛОКИ", tag: "wild", description: "неповторяющиеся модули", icon: "🎲" },
-];
+const DEFAULT_ROTATION = { x: 18, y: -22 };
+const HINT_KERF = 3.2;
+const HINT_SURFACING = 2;
+const HINT_EXTRA = 20;
+const HINT_SQUARE = 10;
 
-type Cell = { material: number; rotate: number; flipX: boolean; flipY: boolean; variationSeed: number };
-type CustomPattern = { id: string; name: string; description: string; tag: string; icon: string; grid: Cell[][]; createdAt: number; materials?: typeof MATERIALS; materialEnabled?: boolean[]; seed?: number; chaos?: number; symmetry?: number };
+type Tab = "pattern" | "build";
 
-function makePattern(kind: string, rows = 12, cols = 16, materialIds = [0, 1, 2, 3, 4], seed = 7, chaos = 0.67, symmetry = 0.42): Cell[][] {
-  return Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => {
-    let n = 0;
-    if (kind === "orbit") n = Math.abs(Math.floor(Math.atan2(y - rows / 2, x - cols / 2) * 2.2 + (x + y) / 3)) % 5;
-    if (kind === "cube") n = (Math.floor(x / 2) + Math.floor(y / 2) + (x % 2) * 2) % 5;
-    if (kind === "zigzag") n = (x + (y % 4 < 2 ? y : -y)) % 5;
-    if (kind === "chaos") n = (x * 13 + y * 7 + (x * y) % 11 + seed) % 5;
-    if (kind === "tessellation") n = (x + y * 2 + (x % 3) * (y % 2) + seed) % 5;
-    if (kind === "kaleido") { const dx = x - cols / 2, dy = y - rows / 2; n = Math.floor((Math.atan2(dy, dx) + Math.PI) * (2 + symmetry * 8) + Math.hypot(dx, dy) * (1 + chaos * 2) + seed) % 5; }
-    if (kind === "voronoi") n = Math.floor((Math.sin((x + seed) * .77) + Math.cos((y - seed) * .61) + Math.sin((x + y) * .31)) * 5 + 10) % 5;
-    if (kind === "pinwheel") n = (Math.floor(Math.atan2(y - rows / 2, x - cols / 2) * (3 + symmetry * 10) + (x + y) * chaos) + seed) % 5;
-    if (kind === "isometric") n = (Math.floor((x + y) / 2) + Math.floor((x - y + cols) / 3) + seed) % 5;
-    if (kind === "checker") n = (Math.floor(x / 2) + Math.floor(y / 2) + seed) % 2;
-    if (kind === "stripes") n = Math.floor((x + seed % 4) / 2) % 4;
-    if (kind === "diag") n = Math.floor((x + y + seed) / 2) % 5;
-    if (kind === "brick") n = (Math.floor(y / 2) + Math.floor((x + (Math.floor(y / 2) % 2) * 2) / 4) + seed) % 5;
-    if (kind === "waves") n = Math.floor((y + Math.sin(x * 0.55 + seed) * (2 + chaos * 4)) / 2) % 5;
-    if (kind === "rings") n = Math.floor(Math.hypot(x - cols / 2, y - rows / 2) / (1.5 + symmetry * 2) + seed) % 5;
-    if (kind === "swirl") n = Math.floor((Math.atan2(y - rows / 2, x - cols / 2) * 4 + Math.hypot(x - cols / 2, y - rows / 2) * (1 + chaos * 2) + seed)) % 5;
-    if (kind === "nested") n = Math.min(x, y, cols - 1 - x, rows - 1 - y) % 5;
-    if (kind === "noise") n = Math.floor((Math.sin((x + seed) * .55) + Math.cos((y - seed) * .63) + Math.sin((x + y) * .27)) * 4 + 10) % 5;
-    if (kind === "terrazzo") n = Math.floor(Math.abs(Math.sin((x + seed) * 1.7 + Math.cos((y - seed) * 2.1)) * 10 + Math.sin((x - y) * .9))) % 5;
-    if (kind === "blocks") n = Math.floor(Math.abs(Math.sin(Math.floor(x / Math.max(1, 1 + chaos * 3)) * 12.9898 + Math.floor(y / Math.max(1, 1 + chaos * 2)) * 78.233 + seed)) * 100) % 5;
-    const seedNoise = Math.sin((x + 1) * 12.9898 + (y + 1) * 78.233 + seed * 37.7) * 43758.5453;
-    n = Math.abs(Math.floor(n + (seedNoise - Math.floor(seedNoise)) * chaos * materialIds.length));
-    return { material: materialIds[(n + materialIds.length) % materialIds.length], rotate: ((x + y + seed) % 4) * 90, flipX: kind === "chaos" && x % 5 === 0, flipY: kind === "cube" && y % 4 === 0, variationSeed: x * 97 + y * 53 + kind.length * 31 + seed * 17 };
-  }));
+function readMm(raw: string, unit: Unit): number | null {
+  if (raw.trim() === "") return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  return fromDisplay(n, unit);
 }
 
-function tileVariation(material: { fiberAngle?: number; grainScale?: number }, seed: number) { const noise = (salt: number) => { const value = Math.sin((seed + 1) * (12.9898 + salt * 78.233)) * 43758.5453; return value - Math.floor(value); }; return { brightness: 0.92 + noise(1) * 0.15, saturation: 0.92 + noise(2) * 0.16, hue: (noise(3) - 0.5) * 6, angle: (material.fiberAngle ?? 0) + (noise(4) - 0.5) * 10, scale: (material.grainScale ?? 1) * (0.88 + noise(5) * 0.24) }; }
-
-function textureBackground(material: { texture?: string; fiberAngle?: number; grainScale?: number; grain: string }, variation?: { angle: number; scale: number }) { const angle = variation?.angle ?? material.fiberAngle ?? 0; const scale = (variation?.scale ?? material.grainScale ?? 1) * 12; if (material.texture === "rays") return `repeating-radial-gradient(circle at 50% 50%, transparent 0 ${scale}px, ${material.grain}55 ${scale + 1}px ${scale + 2}px)`; if (material.texture === "wave") return `repeating-linear-gradient(${angle}deg, transparent 0 ${scale}px, ${material.grain}55 ${scale + 1}px ${scale + 3}px, transparent ${scale + 5}px ${scale + 11}px)`; return `repeating-linear-gradient(${angle}deg, transparent 0 ${scale}px, ${material.grain}55 ${scale + 1}px ${scale + 2}px)`; }
-
-function tileStyle(material: { color: string; grain: string; texture?: string; fiberAngle?: number; grainScale?: number }, cell: Cell) { const variation = tileVariation(material, cell.variationSeed); return { backgroundColor: material.color, backgroundImage: textureBackground(material, variation), backgroundSize: `${Math.max(8, variation.scale * 22)}px ${Math.max(8, variation.scale * 22)}px`, filter: `brightness(${variation.brightness}) saturate(${variation.saturation}) hue-rotate(${variation.hue}deg)` }; }
-
-function PatternPreview({ kind, grid, materials, materialIds, seed, chaos, symmetry }: { kind: string; grid?: Cell[][]; materials: typeof MATERIALS; materialIds: number[]; seed: number; chaos: number; symmetry: number }) { const preview = grid ?? makePattern(kind, 6, 9, materialIds.length ? materialIds : [0], seed, chaos, symmetry); const rows = preview.length || 1; const cols = preview[0]?.length || 1; return <div className="pattern-preview-grid" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridTemplateRows: `repeat(${rows}, 1fr)` }} aria-hidden="true">{preview.flatMap((row, y) => row.map((cell, x) => { const material = materials[cell.material] ?? materials[0] ?? MATERIALS[0]; return <span key={`${kind}-${x}-${y}`} style={{ ...tileStyle(material, cell), transform: `rotate(${cell.rotate}deg) scaleX(${cell.flipX ? -1 : 1}) scaleY(${cell.flipY ? -1 : 1})` }} />; }))}</div>; }
-
-function downloadFile(filename: string, content: string, type: string) {
-  const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const a = document.createElement("a");
-  a.href = url; a.download = filename; a.click(); URL.revokeObjectURL(url);
+function exportFaceSvg(project: Project) {
+  const synced = syncStrips(project);
+  const rows = faceGrid(synced);
+  const w = 800;
+  const h = 480;
+  const rowH = h / Math.max(rows.length, 1);
+  const maxWidth = Math.max(1, synced.sticks.reduce((sum, stick) => sum + stick.width, 0));
+  const rects = rows.flatMap((row, y) => {
+    const offset = synced.strips[y]?.offset ?? 0;
+    let x = (offset / maxWidth) * w;
+    return row.map((cell) => {
+      const cw = (cell.width / maxWidth) * w;
+      const rect = `<rect x="${x}" y="${y * rowH}" width="${cw}" height="${rowH}" fill="${speciesColor(synced, cell.speciesId)}"/>`;
+      x += cw;
+      return rect;
+    });
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${rects.join("")}</svg>`;
+  const blob = new Blob([svg], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${project.name.replace(/\s+/g, "-").toLowerCase()}-face.svg`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-function Swatch({ material, active, onClick }: { material: typeof MATERIALS[number]; active: boolean; onClick: () => void }) {
-  return <button onClick={onClick} aria-label={`Выбрать ${material.name}`} className={`swatch ${active ? "swatch-active" : ""}`} style={{ background: material.color }}><span style={{ background: material.grain }} /><b>{material.code}</b></button>;
+function UnitField({
+  valueMm,
+  unit,
+  onMm,
+  step,
+}: {
+  valueMm: number;
+  unit: Unit;
+  onMm: (mm: number) => void;
+  step?: number;
+}) {
+  return (
+    <Input
+      type="number"
+      step={step ?? (unit === "in" ? 0.05 : 1)}
+      value={toDisplay(valueMm, unit)}
+      onChange={(e) => {
+        const mm = readMm(e.target.value, unit);
+        if (mm !== null) onMm(mm);
+      }}
+    />
+  );
 }
 
 export default function Home() {
-  const [patternName, setPatternName] = useState("ORBITAL / 07");
-  const [patternKind, setPatternKind] = useState("orbit"); const [seed, setSeed] = useState(7); const [chaosFactor, setChaosFactor] = useState(0.67); const [symmetryFactor, setSymmetryFactor] = useState(0.42); const [densityFactor, setDensityFactor] = useState(0.5); const [showLibrary, setShowLibrary] = useState(false);
-  const [grid, setGrid] = useState(() => makePattern("orbit"));
-  const [selected, setSelected] = useState({ x: 7, y: 5 });
-  const [activeMaterial, setActiveMaterial] = useState(1);
-  const [width, setWidth] = useState(420); const [height, setHeight] = useState(280); const [thickness, setThickness] = useState(42); const [kerf, setKerf] = useState(3.2);
-  const [zoom, setZoom] = useState(1); const [activeTab, setActiveTab] = useState("pattern"); const [railOpen, setRailOpen] = useState(true);
-  const [saved, setSaved] = useState(false); const [view3d, setView3d] = useState(false); const [boardRotation, setBoardRotation] = useState({ x: 12, y: -3 }); const [isDraggingBoard, setIsDraggingBoard] = useState(false); const dragStart = useRef<{ x: number; y: number; rotationX: number; rotationY: number } | null>(null); const [materials, setMaterials] = useState<typeof MATERIALS>(() => { try { return JSON.parse(localStorage.getItem("woodcut-materials") || "null") || MATERIALS; } catch { return MATERIALS; } }); const [materialEnabled, setMaterialEnabled] = useState<boolean[]>(() => { try { const stored = JSON.parse(localStorage.getItem("woodcut-material-enabled") || "null"); return Array.isArray(stored) ? stored : MATERIALS.map(() => true); } catch { return MATERIALS.map(() => true); } }); const [showLab, setShowLab] = useState(false); const [editingMaterial, setEditingMaterial] = useState<number | null>(null); const [materialDraft, setMaterialDraft] = useState({ name: "", code: "", color: "#c98a61", cost: "0.15", texture: "linear", fiberAngle: "0", grainScale: "1" });
-  const [showImport, setShowImport] = useState(false); const [sourceUrl, setSourceUrl] = useState(""); const [importCols, setImportCols] = useState(16); const [importRows, setImportRows] = useState(12); const [importContrast, setImportContrast] = useState(0); const [importPreviewGrid, setImportPreviewGrid] = useState<Cell[][] | null>(null); const fileInputRef = useRef<HTMLInputElement>(null);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem("woodcut-favorites") || "[]"); } catch { return []; } });
-  const [customPatterns, setCustomPatterns] = useState<CustomPattern[]>(() => { try { return JSON.parse(localStorage.getItem("woodcut-custom-patterns") || "[]"); } catch { return []; } });
-  const [libraryFilter, setLibraryFilter] = useState<"all" | "favorites" | "mine">("all"); const [showSavePattern, setShowSavePattern] = useState(false); const [customDraft, setCustomDraft] = useState({ name: "", description: "Мой узор из мастерской" });
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [project, setProject] = useState<Project>(
+    () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
+  );
+  const [unit, setUnit] = useState<Unit>("mm");
+  const [seed, setSeed] = useState(1);
+  const [saved, setSaved] = useState(false);
+  const [view3d, setView3d] = useState(false);
+  const [rotation, setRotation] = useState(DEFAULT_ROTATION);
+  const [activeTab, setActiveTab] = useState<Tab>("pattern");
+  const [railOpen, setRailOpen] = useState(true);
+  const [templateId, setTemplateId] = useState<TemplateId | null>("stripes");
 
-  const activeMaterialIds = materialEnabled.map((enabled, index) => enabled ? index : -1).filter(index => index >= 0); const usableMaterialIds = activeMaterialIds.length ? activeMaterialIds : [0];
-  useEffect(() => { localStorage.setItem("woodcut-materials", JSON.stringify(materials)); localStorage.setItem("woodcut-material-enabled", JSON.stringify(materialEnabled)); }, [materials, materialEnabled]);
-  const cell = grid[selected.y]?.[selected.x];
-  const area = (width * height) / 1_000_000;
-  const volume = area * thickness / 1000;
-  const materialCost = useMemo(() => grid.flat().reduce((s, c) => s + (materials[c.material]?.cost ?? 0.15), 0) * (width / 420) * (height / 280), [grid, width, height]);
-  const waste = Math.min(28, 8 + (kerf - 2.5) * 3 + (patternKind === "chaos" ? 6 : 0));
-  const realizable = kerf <= 4 && thickness >= 30;
+  const derived = useMemo(() => derive(project), [project]);
+  const checks = useMemo(() => evaluateChecks(project), [project]);
+  const refuse = hasRefuse(checks);
+  const firstRefuse = checks.find((c) => c.level === "refuse");
+  const firstWarn = checks.find((c) => c.level === "warn");
+  const unitShort = unit === "in" ? "″" : "мм";
 
-  const generate = (kind = patternKind, nextSeed = seed) => { setPatternKind(kind); setGrid(makePattern(kind, Math.round(8 + densityFactor * 8), Math.round(12 + densityFactor * 8), usableMaterialIds, nextSeed, chaosFactor, symmetryFactor)); setPatternName(`${PATTERNS.find(p => p.id === kind)?.name ?? "GENERATIVE"} / ${String(nextSeed).padStart(2, "0")}`); toast.success("Новый узор собран", { description: `Seed ${nextSeed} · ${Math.round(chaosFactor * 100)}% chaos · ${Math.round(symmetryFactor * 100)}% symmetry` }); };
-  const mutateCell = (fn: (c: Cell) => Cell) => setGrid(g => g.map((row, y) => row.map((c, x) => x === selected.x && y === selected.y ? fn(c) : c)));
-  const save = () => { localStorage.setItem("woodcut-project", JSON.stringify({ patternName, grid, width, height, thickness, kerf })); setSaved(true); toast.success("Проект сохранён локально"); };
-  const exportSVG = () => { const w = 800, h = 600; const cw = w / grid[0].length, ch = h / grid.length; const rects = grid.flatMap((row, y) => row.map((c, x) => `<rect x="${x * cw}" y="${y * ch}" width="${cw + .5}" height="${ch + .5}" fill="${materials[c.material]?.color ?? MATERIALS[0].color}"/><path d="M${x*cw+cw*.2} ${y*ch+ch*.5} Q${x*cw+cw*.5} ${y*ch+ch*.15} ${x*cw+cw*.8} ${y*ch+ch*.55}" stroke="${materials[c.material]?.grain ?? MATERIALS[0].grain}" stroke-width="2" opacity=".55" fill="none" transform="rotate(${tileVariation(materials[c.material] ?? MATERIALS[0], c.variationSeed).angle} ${x*cw+cw*.5} ${y*ch+ch*.5})" filter="brightness(${tileVariation(materials[c.material] ?? MATERIALS[0], c.variationSeed).brightness}) saturate(${tileVariation(materials[c.material] ?? MATERIALS[0], c.variationSeed).saturation}) hue-rotate(${tileVariation(materials[c.material] ?? MATERIALS[0], c.variationSeed).hue}deg)"/>`)).join(""); downloadFile("woodcut-pattern.svg", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${rects}</svg>`, "image/svg+xml"); toast.success("SVG экспортирован"); };
-  const print = () => window.print();
-  const openImport = () => { setShowImport(true); setTimeout(() => fileInputRef.current?.click(), 50); };
-  const handleImageFile = (file?: File) => { if (!file || !file.type.startsWith("image/")) { toast.error("Выберите файл изображения"); return; } const url = URL.createObjectURL(file); setSourceUrl(url); const img = new Image(); img.onload = () => { const canvas = document.createElement("canvas"); canvas.width = importCols; canvas.height = importRows; const ctx = canvas.getContext("2d", { willReadFrequently: true }); if (!ctx) return; ctx.drawImage(img, 0, 0, importCols, importRows); const pixels = ctx.getImageData(0, 0, importCols, importRows).data; const next = Array.from({ length: importRows }, (_, y) => Array.from({ length: importCols }, (_, x) => { const i = (y * importCols + x) * 4; const raw = [pixels[i], pixels[i + 1], pixels[i + 2]]; const luma = raw[0] * .299 + raw[1] * .587 + raw[2] * .114; const factor = 1 + importContrast / 50; const boosted = Math.max(0, Math.min(255, 128 + (luma - 128) * factor)); const rgb = raw.map(channel => Math.max(0, Math.min(255, boosted + (channel - luma) * factor))); let best = usableMaterialIds[0]; let bestDistance = Number.POSITIVE_INFINITY; materials.forEach((m, index) => { if (!materialEnabled[index]) return; const hex = m.color.slice(1); const target = [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)]; const distance = rgb.reduce((sum, value, channel) => sum + (value - target[channel]) ** 2, 0); if (distance < bestDistance) { bestDistance = distance; best = index; } }); return { material: best, rotate: 0, flipX: false, flipY: false, variationSeed: x * 97 + y * 53 + file.name.length * 31 }; })); setImportPreviewGrid(next); setGrid(next); setPatternKind("import"); setPatternName(`${file.name.replace(/\\.[^/.]+$/, "").toUpperCase()} / PIXEL MAP`); toast.success("Изображение превращено в древесный пиксельный узор", { description: `${importCols} × ${importRows} ячеек · контраст ${importContrast}% · ${activeMaterialIds.length} пород` }); URL.revokeObjectURL(url); }; img.src = url; };
-  const resetImport = () => { setSourceUrl(""); setImportPreviewGrid(null); setImportContrast(0); setShowImport(false); setPatternKind("orbit"); setGrid(makePattern("orbit", 12, 16, usableMaterialIds, seed, chaosFactor, symmetryFactor)); };   const reroll = () => { const next = seed + 1; setSeed(next); generate(patternKind, next); }; const handleBoardPointerDown = (event: React.PointerEvent<HTMLDivElement>) => { if (!view3d) return; event.currentTarget.setPointerCapture(event.pointerId); dragStart.current = { x: event.clientX, y: event.clientY, rotationX: boardRotation.x, rotationY: boardRotation.y }; setIsDraggingBoard(true); }; const handleBoardPointerMove = (event: React.PointerEvent<HTMLDivElement>) => { if (!dragStart.current || !view3d) return; const dx = event.clientX - dragStart.current.x; const dy = event.clientY - dragStart.current.y; setBoardRotation({ x: Math.max(-8, Math.min(58, dragStart.current.rotationX - dy * 0.28)), y: dragStart.current.rotationY + dx * 0.35 }); }; const endBoardDrag = (event?: React.PointerEvent<HTMLDivElement>) => { if (event && event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); dragStart.current = null; setIsDraggingBoard(false); };
-  const toggleMaterial = (index: number) => { setMaterialEnabled(current => { const next = [...current]; next[index] = !next[index]; if (!next.some(Boolean)) next[index] = true; return next; }); };
-  const startEditMaterial = (index: number) => { const m = materials[index]; setEditingMaterial(index); setMaterialDraft({ name: m.name, code: m.code, color: m.color, cost: String(m.cost), texture: m.texture ?? "linear", fiberAngle: String(m.fiberAngle ?? 0), grainScale: String(m.grainScale ?? 1) }); };
-  const applyMaterial = () => { if (editingMaterial === null) return; if (editingMaterial === -1) { addMaterial(); return; } setMaterials(current => current.map((m, index) => index === editingMaterial ? { ...m, name: materialDraft.name || m.name, code: materialDraft.code.toUpperCase() || m.code, color: materialDraft.color, grain: materialDraft.color, cost: Number(materialDraft.cost) || m.cost, texture: materialDraft.texture, fiberAngle: Number(materialDraft.fiberAngle) || 0, grainScale: Number(materialDraft.grainScale) || 1 } : m)); setEditingMaterial(null); toast.success("Материал обновлён"); };
-  const removeMaterial = (index: number) => { if (materials.length <= 1) return; setMaterials(current => current.filter((_, i) => i !== index)); setMaterialEnabled(current => current.filter((_, i) => i !== index)); setActiveMaterial(current => current === index ? 0 : current > index ? current - 1 : current); setEditingMaterial(null); toast.success("Порода удалена"); };
-  const resetPalette = () => { setMaterials(MATERIALS); setMaterialEnabled(MATERIALS.map(() => true)); toast.success("Палитра сброшена"); };
-  const addMaterial = () => { const id = `custom-${Date.now()}`; setMaterials(current => [...current, { id, name: materialDraft.name || "Custom wood", code: materialDraft.code.toUpperCase() || "CUS", color: materialDraft.color, grain: materialDraft.color, cost: Number(materialDraft.cost) || 0.15, texture: materialDraft.texture, fiberAngle: Number(materialDraft.fiberAngle) || 0, grainScale: Number(materialDraft.grainScale) || 1 }]); setMaterialEnabled(current => [...current, true]); setEditingMaterial(null); toast.success("Порода добавлена в палитру"); };
-  const toggleFavorite = (id: string, event?: React.MouseEvent) => { event?.stopPropagation(); setFavoriteIds(current => { const next = current.includes(id) ? current.filter(item => item !== id) : [...current, id]; localStorage.setItem("woodcut-favorites", JSON.stringify(next)); return next; }); };
-  const saveCurrentPattern = () => { const name = customDraft.name.trim() || `Мой узор ${customPatterns.length + 1}`; const item: CustomPattern = { id: `custom-pattern-${Date.now()}`, name, description: customDraft.description.trim() || "Пользовательский узор", tag: "my pattern", icon: "✦", grid: grid.map(row => row.map(cell => ({ ...cell }))), materials: materials.map(material => ({ ...material })), materialEnabled: [...materialEnabled], seed, chaos: chaosFactor, symmetry: symmetryFactor, createdAt: Date.now() }; setCustomPatterns(current => { const next = [item, ...current]; localStorage.setItem("woodcut-custom-patterns", JSON.stringify(next)); return next; }); setFavoriteIds(current => { const next = current.includes(item.id) ? current : [...current, item.id]; localStorage.setItem("woodcut-favorites", JSON.stringify(next)); return next; }); setCustomDraft({ name: "", description: "Мой узор из мастерской" }); setShowSavePattern(false); toast.success("Узор добавлен в Мои узоры", { description: "Он также сохранён в избранном" }); };
-  const deleteCustomPattern = (id: string, event: React.MouseEvent) => { event.stopPropagation(); setCustomPatterns(current => { const next = current.filter(item => item.id !== id); localStorage.setItem("woodcut-custom-patterns", JSON.stringify(next)); return next; }); setFavoriteIds(current => { const next = current.filter(item => item !== id); localStorage.setItem("woodcut-favorites", JSON.stringify(next)); return next; }); toast.success("Пользовательский узор удалён"); };
-  const libraryItems = [...PATTERNS, ...customPatterns];
-  const visibleLibraryItems = libraryItems.filter(item => libraryFilter === "all" || (libraryFilter === "favorites" && favoriteIds.includes(item.id)) || (libraryFilter === "mine" && customPatterns.some(custom => custom.id === item.id)));
-  const applyLibraryItem = (item: typeof PATTERNS[number] | CustomPattern) => { if ("grid" in item) { if (item.materials) setMaterials(item.materials); if (item.materialEnabled) setMaterialEnabled(item.materialEnabled); if (item.seed) setSeed(item.seed); if (item.chaos !== undefined) setChaosFactor(item.chaos); if (item.symmetry !== undefined) setSymmetryFactor(item.symmetry); setGrid(item.grid.map(row => row.map(cell => ({ ...cell })))); setPatternKind("custom"); setPatternName(item.name); } else { generate(item.id); } setShowLibrary(false); toast.success(`Шаблон «${item.name}» применён`); };
+  const commit = (next: Project, sync = false) => {
+    setProject(sync ? syncStrips(next) : next);
+    setSaved(false);
+  };
 
-  return <div className="app-shell">
-    <header className="topbar"><div className="brand"><div className="brand-mark"><span /><span /><span /><span /></div><div><div className="brand-name">WOODCUT <em>STUDIO</em></div><div className="brand-sub">END-GRAIN / PATTERN ENGINE</div></div></div><div className="project-title"><span className="live-dot" /> <input value={patternName} onChange={e => setPatternName(e.target.value)} aria-label="Название проекта" /><span className="saved-state">{saved ? "SAVED" : "DRAFT"}</span></div><div className="top-actions"><Button variant="ghost" size="icon" aria-label="Отменить"><Undo2 size={17} /></Button><Button variant="ghost" size="icon" aria-label="Повторить"><Redo2 size={17} /></Button><span className="divider" /><Button variant="outline" className="action-button" onClick={save}><Save size={15} /> Save</Button><Button className="accent-button" onClick={exportSVG}><Download size={15} /> Export</Button></div></header>
-    <div className="workspace">
-      <aside className={`left-rail ${railOpen ? "" : "closed"}`}><button className="rail-toggle" onClick={() => setRailOpen(!railOpen)}>{railOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}</button>{railOpen && <><div className="rail-label">WORKSPACE</div><button className={`rail-item active`} onClick={() => setActiveTab("pattern")}><Grid3X3 size={18} /><span>Pattern</span><kbd>1</kbd></button><button className={`rail-item ${activeTab === "build" ? "active" : ""}`} onClick={() => setActiveTab("build")}><Scissors size={18} /><span>Cut map</span><kbd>2</kbd></button><button className={`rail-item ${activeTab === "layers" ? "active" : ""}`} onClick={() => setActiveTab("layers")}><Layers3 size={18} /><span>Glue-ups</span><kbd>3</kbd></button><div className="rail-label rail-label-spaced">TOOLS</div><button className="rail-item" onClick={() => setView3d(!view3d)}><Box size={18} /><span>3D preview</span><i className={`toggle-dot ${view3d ? "on" : ""}`} /></button><button className="rail-item" onClick={openImport}><SquareDashedMousePointer size={18} /><span>Trace image</span></button><div className="rail-bottom"><button className="rail-item" onClick={() => setShowLab(true)}><BookOpen size={18} /><span>Material lab</span></button><button className="rail-item" onClick={() => toast.info("Сочетание клавиш: G — генерация, E — экспорт") }><CircleHelp size={18} /><span>Shortcuts</span></button></div></>}</aside>
-      <main className="main-area"><div className="canvas-toolbar"><div><span className="eyebrow">LIVE BOARD / {view3d ? "AXONOMETRIC" : "TOP VIEW"}</span><span className="canvas-title">{patternName}</span></div><div className="toolbar-actions"><div className="segmented"><button className={!view3d ? "selected" : ""} onClick={() => setView3d(false)}>2D</button><button className={view3d ? "selected" : ""} onClick={() => setView3d(true)}>3D</button></div><Button variant="ghost" size="icon" aria-label="Центрировать" onClick={() => setBoardRotation({ x: 12, y: -3 })}><Maximize2 size={16} /></Button></div></div>
-        <div className={`board-stage ${view3d ? "stage-3d" : ""} ${isDraggingBoard ? "is-dragging" : ""}`} onPointerDown={handleBoardPointerDown} onPointerMove={handleBoardPointerMove} onPointerUp={endBoardDrag} onPointerCancel={endBoardDrag} onPointerLeave={event => { if (dragStart.current && !event.currentTarget.hasPointerCapture(event.pointerId)) endBoardDrag(); }}><div className="ruler ruler-top"><span>0</span><span>105</span><span>210</span><span>315</span><span>{width} mm</span></div><div className="ruler ruler-left"><span>0</span><span>70</span><span>140</span><span>{height} mm</span></div><div className="board-shadow" style={{ transform: `scale(${zoom}) rotateX(${view3d ? `${boardRotation.x}deg` : "0deg"}) rotateY(${view3d ? `${boardRotation.y}deg` : "0deg"})` }}><div className="board-grid" style={{ gridTemplateColumns: `repeat(${grid[0].length}, 1fr)` }}>{grid.flatMap((row, y) => row.map((c, x) => <button key={`${x}-${y}`} className={`wood-cell ${selected.x === x && selected.y === y ? "selected" : ""}`} onClick={() => { setSelected({ x, y }); setActiveMaterial(c.material); }} style={{ ...tileStyle(materials[c.material] ?? MATERIALS[0], c), transform: `rotate(${c.rotate}deg) scaleX(${c.flipX ? -1 : 1}) scaleY(${c.flipY ? -1 : 1})` }}><span style={{ backgroundColor: materials[c.material]?.grain ?? MATERIALS[0].grain, transform: `rotate(${tileVariation(materials[c.material] ?? MATERIALS[0], c.variationSeed).angle}deg)` }} /></button>))}</div><div className="board-edge" /></div><div className="dimension dimension-width"><span /> <b>{width} mm</b><span /></div><div className="dimension dimension-height"><span /> <b>{height} mm</b><span /></div><div className="origin">X 000 / Y 000</div></div>
-        <div className="canvas-footer"><div className="status-line"><span className={`status-icon ${realizable ? "ok" : "warn"}`}>{realizable ? <Check size={13} /> : <Zap size={13} />}</span><div><b>{realizable ? "PHYSICALLY REALIZABLE" : "CHECK PARAMETERS"}</b><small>{realizable ? "No collisions detected · grain direction verified" : "Reduce kerf or increase board thickness"}</small></div></div><div className="zoom-control"><button onClick={() => setZoom(Math.max(.7, zoom - .1))}><Minus size={14} /></button><span>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(Math.min(1.3, zoom + .1))}><Plus size={14} /></button></div></div>
-        <div className="quick-strip"><div className="strip-heading"><span>QUICK PATTERNS</span><button onClick={() => setShowLibrary(true)}>VIEW ALL <ChevronDown size={13} /></button></div><div className="pattern-list">{PATTERNS.map(p => <button key={p.id} className={`pattern-card ${patternKind === p.id ? "chosen" : ""}`} onClick={() => generate(p.id)}><span className="pattern-glyph">{p.icon}</span><span><b>{p.name}</b><small>{p.description}</small></span><i>{p.tag}</i></button>)}</div></div>
-      </main>
-      <aside className="inspector"><div className="inspector-tabs"><button className={activeTab === "pattern" ? "active" : ""} onClick={() => setActiveTab("pattern")}>PATTERN</button><button className={activeTab === "build" ? "active" : ""} onClick={() => setActiveTab("build")}>BUILD</button><button className={activeTab === "layers" ? "active" : ""} onClick={() => setActiveTab("layers")}>COST</button></div>{activeTab === "pattern" && <><section className="panel-section"><div className="section-heading"><span>GENERATIVE ENGINE</span><Sparkles size={14} /></div><Button className="generate-button" onClick={() => generate()}><WandSparkles size={16} /> Generate wild pattern <kbd>G</kbd></Button><Button variant="outline" className="library-button" onClick={() => setShowLibrary(true)}><BookOpen size={15} /> Open pattern library</Button><Button variant="outline" className="library-button save-pattern-button" onClick={() => { setCustomDraft({ name: patternName, description: "Мой узор из текущей доски" }); setShowSavePattern(true); }}><Save size={15} /> Save as my pattern</Button><div className="range-row"><label>Chaos factor <b>{Math.round(chaosFactor * 100)}%</b></label><input type="range" min="0" max="1" step="0.01" value={chaosFactor} onChange={e => setChaosFactor(Number(e.target.value))} /></div><div className="range-row"><label>Symmetry <b>{Math.round(symmetryFactor * 100)}%</b></label><input type="range" min="0" max="1" step="0.01" value={symmetryFactor} onChange={e => setSymmetryFactor(Number(e.target.value))} /></div><div className="range-row"><label>Density <b>{Math.round(densityFactor * 100)}%</b></label><input type="range" min="0" max="1" step="0.05" value={densityFactor} onChange={e => setDensityFactor(Number(e.target.value))} /></div><div className="seed-row"><label>SEED</label><Input type="number" value={seed} onChange={e => setSeed(Math.max(1, Number(e.target.value) || 1))} /><Button variant="outline" size="icon" onClick={reroll} aria-label="Следующий seed"><RotateCcw size={14} /></Button></div></section><section className="panel-section"><div className="section-heading"><span>BOARD DIMENSIONS</span><Ruler size={14} /></div><div className="dimension-grid"><label>WIDTH <div><Input type="number" value={width} onChange={e => setWidth(+e.target.value)} /><span>mm</span></div></label><label>HEIGHT <div><Input type="number" value={height} onChange={e => setHeight(+e.target.value)} /><span>mm</span></div></label><label>THICKNESS <div><Input type="number" value={thickness} onChange={e => setThickness(+e.target.value)} /><span>mm</span></div></label><label>SAW KERF <div><Input type="number" value={kerf} step="0.1" onChange={e => setKerf(+e.target.value)} /><span>mm</span></div></label></div></section><section className="panel-section"><div className="section-heading"><span>WOOD PALETTE</span><button onClick={() => setShowLab(true)}>EDIT</button></div><div className="swatches">{materials.map((m, i) => <Swatch key={m.id} material={m} active={activeMaterial === i && materialEnabled[i]} onClick={() => { setActiveMaterial(i); if (!materialEnabled[i]) toggleMaterial(i); mutateCell(c => ({ ...c, material: i })); }} />)}</div><div className="material-note"><span className="material-chip" style={{ background: materials[activeMaterial]?.color ?? MATERIALS[0].color }} /> <b>{materials[activeMaterial]?.name ?? "Material"}</b><span className="mono">{materials[activeMaterial]?.code ?? "MAT"}</span></div></section><section className="panel-section selected-section"><div className="section-heading"><span>SELECTED CELL</span><span className="cell-coord">X {String(selected.x + 1).padStart(2, "0")} / Y {String(selected.y + 1).padStart(2, "0")}</span></div><div className="transform-actions"><Button variant="outline" onClick={() => mutateCell(c => ({ ...c, rotate: (c.rotate + 90) % 360 }))}><RotateCw size={14} /> 90°</Button><Button variant="outline" onClick={() => mutateCell(c => ({ ...c, flipX: !c.flipX }))}><FlipHorizontal2 size={14} /></Button><Button variant="outline" onClick={() => mutateCell(c => ({ ...c, flipY: !c.flipY }))}><FlipVertical2 size={14} /></Button></div></section></>}{activeTab === "build" && <BuildPanel grid={grid} kerf={kerf} waste={waste} />}{activeTab === "layers" && <CostPanel area={area} volume={volume} materialCost={materialCost} waste={waste} />}</aside>
+  const patchSticksBoard = (updater: (p: Project) => Project) => {
+    setTemplateId(null);
+    setProject((p) => syncStrips(updater(p)));
+    setSaved(false);
+  };
+
+  const save = () => {
+    saveProject(localStorage, STORAGE_KEY, project);
+    setSaved(true);
+    toast.success("Проект сохранён");
+  };
+
+  const downloadJson = () => {
+    downloadProject(project);
+    toast.success("JSON скачан");
+  };
+
+  const openFile = async (file?: File) => {
+    if (!file) return;
+    const parsed = parseProject(await file.text());
+    if (!parsed) {
+      toast.error("Не удалось открыть файл");
+      return;
+    }
+    setProject(parsed);
+    setTemplateId(null);
+    setSaved(false);
+    toast.success("Проект открыт");
+  };
+
+  const generate = () => {
+    const nextSeed = seed + 1;
+    setSeed(nextSeed);
+    setTemplateId(null);
+    commit(generateSequence(project, nextSeed));
+    toast.success("Узор собран", { description: `Зерно ${nextSeed}` });
+  };
+
+  const applyQuick = (id: TemplateId) => {
+    setTemplateId(id);
+    commit(applyTemplate(id, project));
+    toast.success(`Шаблон «${TEMPLATES.find((t) => t.id === id)?.name ?? id}» применён`);
+  };
+
+  const resetCamera = () => setRotation({ ...DEFAULT_ROTATION });
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "g") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA")) return;
+      event.preventDefault();
+      generate();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const statusKind = refuse ? "refuse" : firstWarn ? "warn" : "ok";
+  const statusTitle = refuse ? "Нельзя печатать" : firstWarn ? firstWarn.message : "Можно пилить";
+  const statusDetail = refuse
+    ? firstRefuse?.message ?? "Проверка не пройдена"
+    : firstWarn
+      ? firstWarn.message
+      : "Проверки пройдены · можно в мастерскую";
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="brand">
+          <div className="brand-mark">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div>
+            <div className="brand-name">
+              WOODCUT <em>STUDIO</em>
+            </div>
+            <div className="brand-sub">ТОРЦЕВАЯ ДОСКА</div>
+          </div>
+        </div>
+        <div className="project-title">
+          <span className="live-dot" />
+          <input
+            value={project.name}
+            onChange={(e) => commit({ ...project, name: e.target.value })}
+            aria-label="Название проекта"
+          />
+          <span className="saved-state">{saved ? "СОХРАНЁН" : "ЧЕРНОВИК"}</span>
+        </div>
+        <div className="top-actions">
+          <Button variant="outline" className="action-button" onClick={save}>
+            <Save size={15} /> Сохранить
+          </Button>
+          <Button variant="outline" className="action-button" onClick={downloadJson}>
+            <Download size={15} /> JSON
+          </Button>
+          <Button variant="outline" className="action-button" onClick={() => fileRef.current?.click()}>
+            <FolderOpen size={15} /> Открыть
+          </Button>
+          <Button
+            className="accent-button"
+            onClick={() => {
+              exportFaceSvg(project);
+              toast.success("Лицо сохранено в SVG");
+            }}
+          >
+            <ImageDown size={15} /> SVG
+          </Button>
+        </div>
+      </header>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="hidden-file-input"
+        onChange={(e) => {
+          void openFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+
+      <div className="workspace">
+        <aside className={`left-rail ${railOpen ? "" : "closed"}`}>
+          <button className="rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Свернуть рейку">
+            {railOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          </button>
+          {railOpen && (
+            <>
+              <div className="rail-label">СТОЛ</div>
+              <button
+                className={`rail-item ${activeTab === "pattern" ? "active" : ""}`}
+                onClick={() => setActiveTab("pattern")}
+              >
+                <Grid3X3 size={18} />
+                <span>Узор</span>
+                <kbd>1</kbd>
+              </button>
+              <button
+                className={`rail-item ${activeTab === "build" ? "active" : ""}`}
+                onClick={() => setActiveTab("build")}
+              >
+                <Scissors size={18} />
+                <span>Инструкция</span>
+                <kbd>2</kbd>
+              </button>
+              <div className="rail-label rail-label-spaced">ВИД</div>
+              <button className="rail-item" onClick={() => setView3d((v) => !v)}>
+                <Box size={18} />
+                <span>3D</span>
+                <i className={`toggle-dot ${view3d ? "on" : ""}`} />
+              </button>
+            </>
+          )}
+        </aside>
+
+        <main className="main-area">
+          <div className="canvas-toolbar">
+            <div>
+              <span className="eyebrow">{view3d ? "ЖИВАЯ ДОСКА / 3D" : "ЖИВАЯ ДОСКА / СВЕРХУ"}</span>
+              <span className="canvas-title">{project.name}</span>
+            </div>
+            <div className="toolbar-actions">
+              <div className="segmented">
+                <button className={!view3d ? "selected" : ""} onClick={() => setView3d(false)}>
+                  2D
+                </button>
+                <button className={view3d ? "selected" : ""} onClick={() => setView3d(true)}>
+                  3D
+                </button>
+              </div>
+              <Button variant="ghost" size="icon" aria-label="Сбросить камеру" onClick={resetCamera}>
+                <Maximize2 size={16} />
+              </Button>
+            </div>
+          </div>
+
+          <BoardStage
+            project={project}
+            view3d={view3d}
+            unit={unit}
+            rotation={rotation}
+            onRotation={setRotation}
+            onResetCamera={resetCamera}
+          />
+
+          <div className="canvas-footer">
+            <div className="status-line">
+              <span className={`status-icon ${statusKind}`}>
+                {statusKind === "ok" ? <Check size={13} /> : <AlertTriangle size={13} />}
+              </span>
+              <div>
+                <b>{statusTitle}</b>
+                <small>{statusDetail}</small>
+              </div>
+            </div>
+          </div>
+
+          <div className="quick-strip">
+            <div className="strip-heading">
+              <span>ШАБЛОНЫ</span>
+            </div>
+            <div className="pattern-list desk-templates">
+              {TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.id}
+                  className={`pattern-card ${templateId === tpl.id ? "chosen" : ""}`}
+                  onClick={() => applyQuick(tpl.id)}
+                >
+                  <span className="desk-thumb">
+                    <FacePreview project={applyTemplate(tpl.id)} />
+                  </span>
+                  <span>
+                    <b>{tpl.name}</b>
+                    <small>{tpl.description}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </main>
+
+        <aside className="inspector">
+          <div className="inspector-tabs">
+            <button className={activeTab === "pattern" ? "active" : ""} onClick={() => setActiveTab("pattern")}>
+              УЗОР
+            </button>
+            <button className={activeTab === "build" ? "active" : ""} onClick={() => setActiveTab("build")}>
+              ИНСТРУКЦИЯ
+            </button>
+          </div>
+
+          {activeTab === "pattern" && (
+            <>
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>ГЕНЕРАТОР</span>
+                  <WandSparkles size={14} />
+                </div>
+                <Button className="generate-button" onClick={generate}>
+                  <WandSparkles size={16} /> Собрать узор <kbd>G</kbd>
+                </Button>
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>ПАЛКИ</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const speciesId = project.species[0]?.id;
+                      if (!speciesId) return;
+                      patchSticksBoard((p) => ({
+                        ...p,
+                        sticks: [...p.sticks, { speciesId, width: 35 }],
+                      }));
+                    }}
+                  >
+                    <Plus size={12} /> добавить
+                  </button>
+                </div>
+                {project.sticks.map((stick, index) => (
+                  <div className="stick-row" key={`${stick.speciesId}-${index}`}>
+                    <select
+                      aria-label={`Порода палки ${index + 1}`}
+                      value={stick.speciesId}
+                      onChange={(e) => {
+                        const speciesId = e.target.value;
+                        patchSticksBoard((p) => ({
+                          ...p,
+                          sticks: p.sticks.map((s, i) => (i === index ? { ...s, speciesId } : s)),
+                        }));
+                      }}
+                    >
+                      {project.species.map((sp) => (
+                        <option key={sp.id} value={sp.id}>
+                          {sp.name}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="width-field">
+                      <UnitField
+                        valueMm={stick.width}
+                        unit={unit}
+                        onMm={(width) =>
+                          patchSticksBoard((p) => ({
+                            ...p,
+                            sticks: p.sticks.map((s, i) => (i === index ? { ...s, width } : s)),
+                          }))
+                        }
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-mini"
+                      aria-label={`Удалить палку ${index + 1}`}
+                      onClick={() =>
+                        patchSticksBoard((p) => ({
+                          ...p,
+                          sticks: p.sticks.filter((_, i) => i !== index),
+                        }))
+                      }
+                    >
+                      <Minus size={13} />
+                    </button>
+                  </div>
+                ))}
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>ПОЛОСЫ</span>
+                  <span className="cell-coord">{project.strips.length}</span>
+                </div>
+                {project.strips.map((strip, index) => (
+                  <div className="strip-row" key={index}>
+                    <label className="flip">
+                      <input
+                        type="checkbox"
+                        checked={strip.flip}
+                        onChange={(e) => {
+                          const flip = e.target.checked;
+                          commit({
+                            ...project,
+                            strips: project.strips.map((s, i) => (i === index ? { ...s, flip } : s)),
+                          });
+                        }}
+                      />
+                      переворот {String(index + 1).padStart(2, "0")}
+                    </label>
+                    <div className="offset-field">
+                      <UnitField
+                        valueMm={strip.offset}
+                        unit={unit}
+                        onMm={(offset) =>
+                          commit({
+                            ...project,
+                            strips: project.strips.map((s, i) => (i === index ? { ...s, offset } : s)),
+                          })
+                        }
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                  </div>
+                ))}
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>РАЗМЕР ДОСКИ</span>
+                </div>
+                <div className="dimension-grid">
+                  <label>
+                    ДЛИНА
+                    <div>
+                      <UnitField
+                        valueMm={project.board.length}
+                        unit={unit}
+                        onMm={(length) =>
+                          patchSticksBoard((p) => ({ ...p, board: { ...p.board, length } }))
+                        }
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                  </label>
+                  <label>
+                    ШИРИНА
+                    <div>
+                      <UnitField
+                        valueMm={project.board.width}
+                        unit={unit}
+                        onMm={(width) =>
+                          patchSticksBoard((p) => ({ ...p, board: { ...p.board, width } }))
+                        }
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                  </label>
+                  <label>
+                    ТОЛЩИНА
+                    <div>
+                      <UnitField
+                        valueMm={project.board.thickness}
+                        unit={unit}
+                        onMm={(thickness) =>
+                          patchSticksBoard((p) => ({ ...p, board: { ...p.board, thickness } }))
+                        }
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                  </label>
+                </div>
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>ПРИПУСКИ</span>
+                </div>
+                <div className="dimension-grid allowance-grid">
+                  <label>
+                    КЕРФ
+                    <div>
+                      <UnitField
+                        valueMm={project.kerf}
+                        unit={unit}
+                        step={unit === "in" ? 0.01 : 0.1}
+                        onMm={(kerf) => commit({ ...project, kerf })}
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                    <i className="field-hint">дефолт {formatLength(HINT_KERF, unit)}</i>
+                  </label>
+                  <label>
+                    ФУГОВКА
+                    <div>
+                      <UnitField
+                        valueMm={project.surfacing}
+                        unit={unit}
+                        onMm={(surfacing) => commit({ ...project, surfacing })}
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                    <i className="field-hint">дефолт {formatLength(HINT_SURFACING, unit)}</i>
+                  </label>
+                  <label>
+                    ЗАПАС
+                    <div>
+                      <UnitField
+                        valueMm={project.extraLength}
+                        unit={unit}
+                        onMm={(extraLength) => commit({ ...project, extraLength })}
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                    <i className="field-hint">дефолт {formatLength(HINT_EXTRA, unit)}</i>
+                  </label>
+                  <label>
+                    ВЫРАВН.
+                    <div>
+                      <UnitField
+                        valueMm={project.squareUp}
+                        unit={unit}
+                        onMm={(squareUp) => commit({ ...project, squareUp })}
+                      />
+                      <span>{unitShort}</span>
+                    </div>
+                    <i className="field-hint">дефолт {formatLength(HINT_SQUARE, unit)}</i>
+                  </label>
+                </div>
+              </section>
+            </>
+          )}
+
+          {activeTab === "build" && <Instruction project={project} unit={unit} />}
+        </aside>
+      </div>
+
+      <footer className="bottom-status">
+        <div>
+          <span className="status-key">ПРОЕКТ</span> {project.name}
+        </div>
+        <div>
+          <span className="status-key">КЕРФ</span> {formatLength(project.kerf, unit)}
+          <span className="status-key">ПОЛОСЫ</span> {derived.stripCount}
+        </div>
+        <div className="footer-right">
+          <span className="status-key">ЕДИНИЦЫ</span>
+          <div className="unit-switch">
+            <button className={`unit-toggle ${unit === "mm" ? "selected" : ""}`} onClick={() => setUnit("mm")}>
+              MM
+            </button>
+            <button className={`unit-toggle ${unit === "in" ? "selected" : ""}`} onClick={() => setUnit("in")}>
+              ДЮЙМ
+            </button>
+          </div>
+          <button
+            onClick={() => {
+              setActiveTab("build");
+              requestAnimationFrame(() => window.print());
+            }}
+            className="footer-action"
+            disabled={refuse}
+          >
+            <Printer size={13} /> ПЕЧАТЬ
+          </button>
+        </div>
+      </footer>
     </div>
-    <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" className="hidden-file-input" onChange={e => handleImageFile(e.target.files?.[0])} />
-    {showImport && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Импорт изображения"><div className="import-modal"><div className="import-modal-head"><div><span className="eyebrow">TRACE IMAGE / PIXELIZER</span><h2>Преврати картинку в древесную мозаику</h2><p>Каждый пиксель будет сопоставлен с ближайшей породой из активной палитры.</p></div><button className="modal-close" onClick={() => setShowImport(false)} aria-label="Закрыть"><X size={18} /></button></div><div className="import-body"><div className="dropzone" onClick={() => fileInputRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); handleImageFile(e.dataTransfer.files?.[0]); }}>{sourceUrl ? <img src={sourceUrl} alt="Загруженный исходник" /> : <><SquareDashedMousePointer size={30} /><b>Перетащи изображение сюда</b><span>PNG, JPG или WebP · кликни для выбора</span></>}</div><div className="import-settings"><div className="section-heading"><span>PIXEL GRID</span><Grid3X3 size={14} /></div><div className="dimension-grid"><label>COLS <div><Input type="number" min="4" max="32" value={importCols} onChange={e => setImportCols(Math.max(4, Math.min(32, +e.target.value)))} /><span>px</span></div></label><label>ROWS <div><Input type="number" min="4" max="24" value={importRows} onChange={e => setImportRows(Math.max(4, Math.min(24, +e.target.value)))} /><span>px</span></div></label></div><div className="range-row import-contrast-row"><label>CONTRAST <b>{importContrast}%</b></label><input type="range" min="0" max="100" step="5" value={importContrast} onChange={e => setImportContrast(Number(e.target.value))} /></div><div className="import-note"><Sparkles size={15} /><span>После изменения сетки или контраста загрузи файл ещё раз, чтобы пересчитать палитру.</span></div>{importPreviewGrid && <div className="import-result-preview"><span>WOOD PIXEL RESULT</span><PatternPreview kind="import-result" grid={importPreviewGrid} materials={materials} materialIds={usableMaterialIds} seed={seed} chaos={chaosFactor} symmetry={symmetryFactor} /></div>}<div className="palette-preview"><span>ACTIVE PALETTE</span><div>{materials.map((m, index) => <i key={m.id} className={materialEnabled[index] ? "palette-dot-active" : "palette-dot-off"} style={{ background: m.color }} title={m.name} />)}</div></div></div></div><div className="import-modal-foot"><span><Check size={14} /> Локальная обработка в браузере</span><div><Button variant="outline" onClick={resetImport}>Reset</Button><Button className="accent-button" disabled={!sourceUrl} onClick={() => setShowImport(false)}>Use pixel pattern <ArrowDownToLine size={15} /></Button></div></div></div></div>}
-    {showLab && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Material Lab"><div className="lab-modal"><div className="import-modal-head"><div><span className="eyebrow">MATERIAL LAB / PALETTE CONTROL</span><h2>Собери свою палитру</h2><p>Отключённые породы не участвуют в генерации и сопоставлении изображения.</p></div><button className="modal-close" onClick={() => setShowLab(false)} aria-label="Закрыть"><X size={18} /></button></div><div className="lab-body"><div className="lab-list"><div className="section-heading"><span>AVAILABLE SPECIES · {activeMaterialIds.length}/{materials.length} ACTIVE</span><button onClick={resetPalette}>RESET</button></div>{materials.map((m, index) => <div className={`lab-row ${materialEnabled[index] ? "enabled" : "disabled"}`} key={m.id}><button className="material-check" onClick={() => toggleMaterial(index)} aria-label={`Включить ${m.name}`}>{materialEnabled[index] ? <Check size={13} /> : <X size={13} />}</button><span className="lab-swatch" style={{ background: m.color }} /><div className="lab-name"><b>{m.name}</b><small>{m.code} · ${m.cost.toFixed(2)} / cm³</small></div><button className="lab-edit" onClick={() => startEditMaterial(index)}><Settings2 size={14} /></button><button className="lab-delete" onClick={() => removeMaterial(index)} aria-label={`Удалить ${m.name}`}><Trash2 size={14} /></button></div>)}<Button className="add-material" variant="outline" onClick={() => { setEditingMaterial(-1); setMaterialDraft({ name: "", code: "", color: "#c98a61", cost: "0.15", texture: "linear", fiberAngle: "0", grainScale: "1" }); }}><Plus size={15} /> Add custom species</Button></div><div className="lab-editor">{editingMaterial === null ? <div className="lab-empty"><BookOpen size={26} /><b>Выбери породу для редактирования</b><span>Цвет образца влияет на pixel mapping. Стоимость попадёт в расчёт материалов.</span></div> : <><div className="section-heading"><span>{editingMaterial === -1 ? "NEW SPECIES" : "EDIT SPECIES"}</span><button onClick={() => setEditingMaterial(null)}>CANCEL</button></div><div className="lab-form"><label>NAME<Input value={materialDraft.name} onChange={e => setMaterialDraft({ ...materialDraft, name: e.target.value })} placeholder="e.g. Purpleheart" /></label><label>CODE<Input value={materialDraft.code} maxLength={4} onChange={e => setMaterialDraft({ ...materialDraft, code: e.target.value })} placeholder="PUR" /></label><label>COLOR<div className="color-editor"><input type="color" value={materialDraft.color} onChange={e => setMaterialDraft({ ...materialDraft, color: e.target.value })} /><Input value={materialDraft.color} onChange={e => setMaterialDraft({ ...materialDraft, color: e.target.value })} /></div></label><label>COST / cm³<Input type="number" step="0.01" value={materialDraft.cost} onChange={e => setMaterialDraft({ ...materialDraft, cost: e.target.value })} /></label><label>TEXTURE<select value={materialDraft.texture} onChange={e => setMaterialDraft({ ...materialDraft, texture: e.target.value })}><option value="linear">Linear grain</option><option value="wave">Wavy grain</option><option value="rays">End-grain rays</option></select></label><label>FIBER ANGLE <span className="field-inline-value">{materialDraft.fiberAngle}°</span><input type="range" min="-90" max="90" value={materialDraft.fiberAngle} onChange={e => setMaterialDraft({ ...materialDraft, fiberAngle: e.target.value })} /></label><label>GRAIN SCALE <span className="field-inline-value">{materialDraft.grainScale}×</span><input type="range" min="0.5" max="2" step="0.1" value={materialDraft.grainScale} onChange={e => setMaterialDraft({ ...materialDraft, grainScale: e.target.value })} /></label></div><div className="material-large-preview" style={{ background: materialDraft.color, backgroundImage: materialDraft.texture === "rays" ? `repeating-radial-gradient(circle at 50% 50%, transparent 0 10px, rgba(0,0,0,.12) 11px 12px)` : `repeating-linear-gradient(${materialDraft.fiberAngle}deg, transparent 0 ${Math.max(3, 12 * Number(materialDraft.grainScale))}px, rgba(0,0,0,.12) ${Math.max(4, 13 * Number(materialDraft.grainScale))}px ${Math.max(5, 14 * Number(materialDraft.grainScale))}px)` }}><span>{materialDraft.code || "MAT"}</span><b>{materialDraft.name || "New wood species"}</b></div><Button className="accent-button lab-save" onClick={applyMaterial}>{editingMaterial === -1 ? "Add species" : "Save changes"} <Check size={15} /></Button></>}</div></div><div className="import-modal-foot"><span><Check size={14} /> Палитра сохраняется в текущем проекте</span><Button className="accent-button" onClick={() => { setShowLab(false); generate(); }}><WandSparkles size={15} /> Generate with this palette</Button></div></div></div>}
-    {showLibrary && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Pattern Library"><div className="library-modal"><div className="import-modal-head"><div><span className="eyebrow">PATTERN LIBRARY / GENERATIVE GEOMETRY</span><h2>Выбери геометрию — остальное соберёт движок</h2><p>Сохраняй понравившееся и собирай личную коллекцию узоров для следующих досок.</p></div><button className="modal-close" onClick={() => setShowLibrary(false)} aria-label="Закрыть"><X size={18} /></button></div><div className="library-toolbar"><span className="library-count">{visibleLibraryItems.length} / {libraryItems.length} PATTERNS · {favoriteIds.length} FAVORITES</span><div className="library-filters"><button className={libraryFilter === "all" ? "filter-active" : ""} onClick={() => setLibraryFilter("all")}>ALL</button><button className={libraryFilter === "favorites" ? "filter-active" : ""} onClick={() => setLibraryFilter("favorites")}><Star size={11} /> FAVORITES</button><button className={libraryFilter === "mine" ? "filter-active" : ""} onClick={() => setLibraryFilter("mine")}>MY PATTERNS</button></div></div><div className="library-grid">{visibleLibraryItems.length ? visibleLibraryItems.map(item => { const isCustom = "grid" in item; const isFavorite = favoriteIds.includes(item.id); return <div key={item.id} className={`library-card ${patternKind === item.id ? "selected" : ""}`} role="button" tabIndex={0} onClick={() => applyLibraryItem(item)} onKeyDown={event => { if (event.key === "Enter" || event.key === " ") applyLibraryItem(item); }}><PatternPreview kind={item.id} grid={isCustom ? (item as CustomPattern).grid : undefined} materials={materials} materialIds={usableMaterialIds} seed={seed} chaos={chaosFactor} symmetry={symmetryFactor} /><button className={`favorite-toggle ${isFavorite ? "is-favorite" : ""}`} onClick={event => toggleFavorite(item.id, event)} aria-label={isFavorite ? "Убрать из избранного" : "Добавить в избранное"}><Star size={15} fill={isFavorite ? "currentColor" : "none"} /></button>{isCustom && <button className="delete-pattern-toggle" onClick={event => deleteCustomPattern(item.id, event)} aria-label="Удалить пользовательский узор"><Trash2 size={13} /></button>}<span className="library-glyph">{item.icon}</span><span className="library-card-title">{item.name}</span><span className="library-card-description">{item.description}</span><span className="library-card-meta">{item.tag}{isCustom ? " · saved locally" : ` · seed ${seed}`}</span><span className="library-card-action">USE PATTERN <ArrowDownToLine size={13} /></span></div>; }) : <div className="library-empty"><Star size={24} /><b>Здесь пока пусто</b><span>Отметь шаблон звездой или сохрани текущую доску как свой узор.</span></div>}</div><div className="library-footer"><span><Sparkles size={14} /> Локальная библиотека · избранное и мои узоры доступны без аккаунта</span><div className="library-footer-actions"><Button variant="outline" onClick={() => { setCustomDraft({ name: patternName, description: "Мой узор из текущей доски" }); setShowSavePattern(true); }}><Save size={14} /> Save current</Button><Button variant="outline" onClick={reroll}><RotateCcw size={14} /> Reroll seed</Button></div></div></div></div>}
-    {showSavePattern && <div className="import-overlay" role="dialog" aria-modal="true" aria-label="Сохранить пользовательский узор"><div className="save-pattern-modal"><div className="import-modal-head"><div><span className="eyebrow">MY PATTERN / LOCAL LIBRARY</span><h2>Сохрани этот узор</h2><p>Текущая сетка, повороты, отражения и характер древесины будут сохранены как отдельный шаблон.</p></div><button className="modal-close" onClick={() => setShowSavePattern(false)} aria-label="Закрыть"><X size={18} /></button></div><div className="save-pattern-form"><label>NAME<Input autoFocus value={customDraft.name} onChange={event => setCustomDraft({ ...customDraft, name: event.target.value })} placeholder="Например: Янтарный разлом" /></label><label>DESCRIPTION<Input value={customDraft.description} onChange={event => setCustomDraft({ ...customDraft, description: event.target.value })} placeholder="Коротко о характере узора" /></label><div className="save-pattern-preview"><PatternPreview kind="custom-current" grid={grid} materials={materials} materialIds={usableMaterialIds} seed={seed} chaos={chaosFactor} symmetry={symmetryFactor} /><span>{grid[0]?.length ?? 0} × {grid.length} cells · {materials.length} wood species</span></div></div><div className="import-modal-foot"><span><Check size={14} /> Сохраняется только в этом браузере</span><div><Button variant="outline" onClick={() => setShowSavePattern(false)}>Cancel</Button><Button className="accent-button" onClick={saveCurrentPattern}><Save size={15} /> Save pattern</Button></div></div></div></div>}
-    <footer className="bottom-status"><div><span className="status-key">PROJECT</span> {patternName}</div><div><span className="status-key">CELLS</span> {grid.flat().length} <span className="status-key">CUTS</span> {grid.length + 4} <span className="status-key">KERF</span> {kerf} mm</div><div className="footer-right"><span className="status-key">UNIT</span><button className="unit-toggle">MM <ChevronDown size={12} /></button><button onClick={print} className="footer-action"><Printer size={13} /> PRINT WORKSHEET</button></div></footer>
-  </div>;
+  );
 }
-
-function BuildPanel({ grid, kerf, waste }: { grid: Cell[][]; kerf: number; waste: number }) { const cuts = Math.max(8, Math.round(grid[0].length * .75)); return <><section className="panel-section build-hero"><div className="section-heading"><span>CUT MAP / 01</span><Scissors size={14} /></div><div className="cut-preview">{Array.from({ length: 10 }, (_, i) => <span key={i} style={{ background: MATERIALS[(i * 2) % 5].color, height: `${30 + (i % 3) * 9}px` }} />)}</div><p>Rip strips along the grain, then rotate every second strip 90° before the final glue-up.</p></section><section className="panel-section"><div className="stat-line"><span>Estimated cuts</span><b>{cuts} strips</b></div><div className="stat-line"><span>Kerf allowance</span><b>{kerf} mm</b></div><div className="stat-line"><span>Offcut reserve</span><b>{waste.toFixed(1)}%</b></div></section><section className="panel-section"><div className="section-heading"><span>GLUE-UP SEQUENCE</span><span className="steps">4 STEPS</span></div>{["Rip strips / mark grain", "Rotate alternating strips", "Glue-up A / clamp 20 min", "Cross-cut & final glue-up"].map((s, i) => <div className="step" key={s}><span>{String(i + 1).padStart(2, "0")}</span>{s}<Check size={13} /></div>)}</section></>; }
-function CostPanel({ area, volume, materialCost, waste }: { area: number; volume: number; materialCost: number; waste: number }) { return <><section className="panel-section cost-hero"><div className="section-heading"><span>MATERIAL TAKEOFF</span><Layers3 size={14} /></div><div className="cost-total"><small>ESTIMATED STOCK COST</small><strong>${(materialCost * 100 + 14).toFixed(2)}</strong><span>+ 18% contingency</span></div><Progress value={100 - waste} /><div className="progress-labels"><span>usable stock</span><b>{(100 - waste).toFixed(1)}%</b></div></section><section className="panel-section"><div className="stat-line"><span>Board face</span><b>{(area * 10000).toFixed(0)} cm²</b></div><div className="stat-line"><span>Finished volume</span><b>{volume.toFixed(3)} L</b></div><div className="stat-line"><span>Material waste</span><b className="orange">{waste.toFixed(1)}%</b></div><div className="stat-line"><span>Stock to buy</span><b>{(volume * (1 + waste / 100)).toFixed(3)} L</b></div></section><section className="panel-section"><div className="section-heading"><span>BY SPECIES</span><button><Copy size={13} /> COPY</button></div>{MATERIALS.slice(0, 4).map((m, i) => <div className="material-cost" key={m.id}><span className="material-chip" style={{ background: m.color }} /><b>{m.code}</b><span>{[31, 27, 22, 20][i]}%</span><strong>{(volume * [31, 27, 22, 20][i] / 100).toFixed(3)} L</strong></div>)}</section></>; }
