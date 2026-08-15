@@ -1,0 +1,14 @@
+packages:
+  - "."
+
+patchedDependencies:
+  wouter: patches/wouter.patch
+
+overrides:
+  tailwindcss>nanoid: 3.3.7
+
+minimumReleaseAgeExclude:
+  - '@hookform/resolvers@5.9.0'
+
+allowBuilds:
+  esbuild: set this to true or false
