@@ -14,11 +14,15 @@ export const DEFAULT_KERF = 3.2;
 export const DEFAULT_SURFACING = 2;
 export const DEFAULT_EXTRA_LENGTH = 20;
 export const DEFAULT_SQUARE_UP = 10;
+export const DEFAULT_BLOCK_SIZE = 20;
+export const STANDARD_WIDTHS = [15, 20, 25, 30, 40] as const;
+export const DEFAULT_STICK_WIDTH = 20;
 
 export function emptyProject(name = "Полосы"): Project {
   return {
     version: 1,
     name,
+    shopPath: "strip",
     board: { length: 400, width: 280, thickness: 40 },
     kerf: DEFAULT_KERF,
     surfacing: DEFAULT_SURFACING,
@@ -27,5 +31,7 @@ export function emptyProject(name = "Полосы"): Project {
     species: SPECIES.map((s) => ({ ...s })),
     sticks: [],
     strips: [],
+    blockSize: DEFAULT_BLOCK_SIZE,
+    courses: [],
   };
 }

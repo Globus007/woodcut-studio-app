@@ -1,6 +1,7 @@
-import { emptyProject, SPECIES } from "./defaults";
+import { syncCourses } from "./blocks";
+import { DEFAULT_BLOCK_SIZE, emptyProject, SPECIES } from "./defaults";
 import { syncStrips } from "./derive";
-import type { Project, Species, Stick, StripOp } from "./types";
+import type { Project, ShopPath, Species, Stick, StripOp } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -45,6 +46,18 @@ function parseStrips(value: unknown): StripOp[] {
   });
 }
 
+function parseShopPath(value: unknown): ShopPath {
+  return value === "block" ? "block" : "strip";
+}
+
+function parseCourses(value: unknown): string[][] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((row) => {
+    if (!Array.isArray(row)) return [];
+    return [row.flatMap((cell) => (typeof cell === "string" ? [cell] : []))];
+  });
+}
+
 export function serializeProject(project: Project): string {
   return JSON.stringify(project);
 }
@@ -58,6 +71,7 @@ export function parseProject(raw: string): Project | null {
     const project: Project = {
       version: 1,
       name: asString(data.name, fallback.name),
+      shopPath: parseShopPath(data.shopPath),
       board: {
         length: asNumber(board.length, fallback.board.length),
         width: asNumber(board.width, fallback.board.width),
@@ -70,8 +84,10 @@ export function parseProject(raw: string): Project | null {
       species: parseSpecies(data.species),
       sticks: parseSticks(data.sticks),
       strips: parseStrips(data.strips),
+      blockSize: asNumber(data.blockSize, DEFAULT_BLOCK_SIZE),
+      courses: parseCourses(data.courses),
     };
-    return syncStrips(project);
+    return project.shopPath === "block" ? syncCourses(project) : syncStrips(project);
   } catch {
     return null;
   }

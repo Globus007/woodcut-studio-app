@@ -1,18 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { applyTemplate } from "./templates";
-import { derive, faceRow, gen1Blank, stripCount } from "./derive";
+import { bakeToBlocks, derive, faceRow, gen1Blank, setShopPath, stripCount } from "./derive";
 
 describe("glue-first derive", () => {
   it("computes blank length from strips, kerf and extra", () => {
     const project = applyTemplate("stripes");
-    // 8 sticks × 35 = 280 wide; first stick 35 → motif 35; length 400 → 11 strips
-    expect(project.sticks[0].width).toBe(35);
-    expect(stripCount(project)).toBe(11);
+    expect(project.sticks[0].width).toBe(20);
+    expect(project.sticks).toHaveLength(14);
+    expect(stripCount(project)).toBe(20);
     const blank = gen1Blank(project);
-    // crosscut 40+2=42; 11*42 + 11*3.2 + 20 = 462 + 35.2 + 20 = 517.2
-    expect(blank.length).toBe(517.2);
+    expect(blank.length).toBe(924);
     expect(blank.width).toBe(280 + 10);
-    expect(blank.thickness).toBe(35);
+    expect(blank.thickness).toBe(20);
   });
 
   it("checker flips every other strip", () => {
@@ -25,8 +24,46 @@ describe("glue-first derive", () => {
 
   it("reports remainder when length does not divide motif", () => {
     const project = applyTemplate("stripes");
-    project.board.length = 400;
+    project.board.length = 409;
     const d = derive(project);
-    expect(d.remainder).toBe(400 - 11 * 35);
+    expect(d.remainder).toBe(409 - 20 * 20);
+  });
+
+  it("herring steps offset by one stick", () => {
+    const project = applyTemplate("herring");
+    expect(project.sticks[0].speciesId).toBe(project.sticks[1].speciesId);
+    expect(project.strips[0].offset).toBe(0);
+    expect(project.strips[1].offset).toBe(20);
+    expect(project.strips[2].offset).toBe(40);
+  });
+
+  it("weave uses AABB and a two-stick offset", () => {
+    const project = applyTemplate("weave");
+    expect(project.sticks.map((s) => s.speciesId).slice(0, 4)).toEqual([
+      project.sticks[0].speciesId,
+      project.sticks[0].speciesId,
+      project.sticks[2].speciesId,
+      project.sticks[2].speciesId,
+    ]);
+    expect(project.strips[1].offset).toBe(40);
+  });
+});
+
+describe("block path", () => {
+  it("bakes a strip face onto courses and refuses the reverse", () => {
+    const strip = applyTemplate("checker");
+    const baked = bakeToBlocks(strip);
+    expect(baked.shopPath).toBe("block");
+    expect(baked.courses.length).toBe(20);
+    expect(baked.courses[0].length).toBe(14);
+    expect(setShopPath(baked, "strip")).toBeNull();
+  });
+
+  it("counts blocks on the takeoff", () => {
+    const project = applyTemplate("stripes", { ...applyTemplate("stripes"), shopPath: "block" });
+    const d = derive(project);
+    expect(d.takeoff.some((row) => row.blocks > 0)).toBe(true);
+    expect(d.blockCols).toBe(14);
+    expect(d.blockRows).toBe(20);
   });
 });

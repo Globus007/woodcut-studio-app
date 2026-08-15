@@ -46,8 +46,9 @@ export function BoardStage(props: {
   rotation: { x: number; y: number };
   onRotation: (next: { x: number; y: number }) => void;
   onResetCamera: () => void;
+  onPaint?: (row: number, col: number) => void;
 }): JSX.Element {
-  const { project, view3d, unit, rotation, onRotation, onResetCamera } = props;
+  const { project, view3d, unit, rotation, onRotation, onResetCamera, onPaint } = props;
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
@@ -177,7 +178,7 @@ export function BoardStage(props: {
           </>
         ) : (
           <div className="desk-face-2d">
-            <FacePreview project={project} />
+            <FacePreview project={project} onPaint={view3d ? undefined : onPaint} />
           </div>
         )}
       </div>

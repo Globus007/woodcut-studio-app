@@ -21,9 +21,12 @@ export type BoardSize = {
   thickness: number;
 };
 
+export type ShopPath = "strip" | "block";
+
 export type Project = {
   version: 1;
   name: string;
+  shopPath: ShopPath;
   board: BoardSize;
   kerf: number;
   surfacing: number;
@@ -32,6 +35,8 @@ export type Project = {
   species: Species[];
   sticks: Stick[];
   strips: StripOp[];
+  blockSize: number;
+  courses: string[][];
 };
 
 export type Unit = "mm" | "in";
@@ -49,6 +54,7 @@ export type TakeoffRow = {
   speciesName: string;
   width: number;
   length: number;
+  blocks: number;
 };
 
 export type Gen1Blank = {
@@ -67,6 +73,10 @@ export type Derived = {
   stripCount: number;
   crosscutWidth: number;
   remainder: number;
+  remainderX: number;
+  remainderY: number;
+  blockCols: number;
+  blockRows: number;
   blank: Gen1Blank;
   stickSum: number;
   takeoff: TakeoffRow[];

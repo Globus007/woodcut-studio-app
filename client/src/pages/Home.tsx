@@ -8,6 +8,7 @@ import {
   FolderOpen,
   Grid3X3,
   ImageDown,
+  ImagePlus,
   Maximize2,
   Minus,
   PanelLeftClose,
@@ -35,10 +36,17 @@ import {
   fromDisplay,
   toDisplay,
   syncStrips,
+  syncCourses,
   TEMPLATES,
   faceGrid,
   speciesColor,
+  setShopPath,
+  paintBlock,
+  imageToCourses,
+  DEFAULT_STICK_WIDTH,
+  STANDARD_WIDTHS,
   type Project,
+  type ShopPath,
   type TemplateId,
   type Unit,
 } from "@/domain";
@@ -62,18 +70,21 @@ function readMm(raw: string, unit: Unit): number | null {
 }
 
 function exportFaceSvg(project: Project) {
-  const synced = syncStrips(project);
-  const rows = faceGrid(synced);
+  const rows = faceGrid(project);
   const w = 800;
   const h = 480;
   const rowH = h / Math.max(rows.length, 1);
-  const maxWidth = Math.max(1, synced.sticks.reduce((sum, stick) => sum + stick.width, 0));
+  const maxWidth = Math.max(
+    1,
+    project.shopPath === "block"
+      ? project.board.width
+      : project.sticks.reduce((sum, stick) => sum + stick.width, 0),
+  );
   const rects = rows.flatMap((row, y) => {
-    const offset = synced.strips[y]?.offset ?? 0;
-    let x = (offset / maxWidth) * w;
+    let x = 0;
     return row.map((cell) => {
       const cw = (cell.width / maxWidth) * w;
-      const rect = `<rect x="${x}" y="${y * rowH}" width="${cw}" height="${rowH}" fill="${speciesColor(synced, cell.speciesId)}"/>`;
+      const rect = `<rect x="${x}" y="${y * rowH}" width="${cw}" height="${rowH}" fill="${speciesColor(project, cell.speciesId)}"/>`;
       x += cw;
       return rect;
     });
@@ -112,8 +123,22 @@ function UnitField({
   );
 }
 
+async function pixelsFromFile(file: File): Promise<{ width: number; height: number; data: Uint8ClampedArray } | null> {
+  const bitmap = await createImageBitmap(file);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0);
+  const image = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+  bitmap.close();
+  return image;
+}
+
 export default function Home() {
   const fileRef = useRef<HTMLInputElement>(null);
+  const imageRef = useRef<HTMLInputElement>(null);
   const [project, setProject] = useState<Project>(
     () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
   );
@@ -125,6 +150,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("pattern");
   const [railOpen, setRailOpen] = useState(true);
   const [templateId, setTemplateId] = useState<TemplateId | null>("stripes");
+  const [brushId, setBrushId] = useState("walnut");
 
   const derived = useMemo(() => derive(project), [project]);
   const checks = useMemo(() => evaluateChecks(project), [project]);
@@ -133,14 +159,16 @@ export default function Home() {
   const firstWarn = checks.find((c) => c.level === "warn");
   const unitShort = unit === "in" ? "″" : "мм";
 
+  const align = (next: Project) => (next.shopPath === "block" ? syncCourses(next) : syncStrips(next));
+
   const commit = (next: Project, sync = false) => {
-    setProject(sync ? syncStrips(next) : next);
+    setProject(sync ? align(next) : next);
     setSaved(false);
   };
 
   const patchSticksBoard = (updater: (p: Project) => Project) => {
     setTemplateId(null);
-    setProject((p) => syncStrips(updater(p)));
+    setProject((p) => align(updater(p)));
     setSaved(false);
   };
 
@@ -180,6 +208,41 @@ export default function Home() {
     setTemplateId(id);
     commit(applyTemplate(id, project));
     toast.success(`Шаблон «${TEMPLATES.find((t) => t.id === id)?.name ?? id}» применён`);
+  };
+
+  const changePath = (path: ShopPath) => {
+    const next = setShopPath(project, path);
+    if (!next) {
+      toast.error("Из шашек обратно в палки нельзя — сетка уже не один щит.");
+      return;
+    }
+    setTemplateId(null);
+    commit(next);
+    toast.success(path === "block" ? "Цех шашек: лицо запечено в сетку" : "Цех палок");
+  };
+
+  const paint = (row: number, col: number) => {
+    setTemplateId(null);
+    setProject((p) => paintBlock(p, row, col, brushId));
+    setSaved(false);
+  };
+
+  const importPhoto = async (file?: File) => {
+    if (!file) return;
+    try {
+      const pixels = await pixelsFromFile(file);
+      if (!pixels) {
+        toast.error("Не удалось прочитать снимок");
+        return;
+      }
+      const onBlock = project.shopPath === "block" ? project : setShopPath(project, "block");
+      if (!onBlock) return;
+      setTemplateId(null);
+      commit(imageToCourses(onBlock, pixels));
+      toast.success("Фото село на шашки — поправь кистью");
+    } catch {
+      toast.error("Не удалось прочитать снимок");
+    }
   };
 
   const resetCamera = () => setRotation({ ...DEFAULT_ROTATION });
@@ -262,6 +325,16 @@ export default function Home() {
           e.target.value = "";
         }}
       />
+      <input
+        ref={imageRef}
+        type="file"
+        accept="image/*"
+        className="hidden-file-input"
+        onChange={(e) => {
+          void importPhoto(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
 
       <div className="workspace">
         <aside className={`left-rail ${railOpen ? "" : "closed"}`}>
@@ -325,6 +398,7 @@ export default function Home() {
             rotation={rotation}
             onRotation={setRotation}
             onResetCamera={resetCamera}
+            onPaint={project.shopPath === "block" ? paint : undefined}
           />
 
           <div className="canvas-footer">
@@ -351,7 +425,7 @@ export default function Home() {
                   onClick={() => applyQuick(tpl.id)}
                 >
                   <span className="desk-thumb">
-                    <FacePreview project={applyTemplate(tpl.id)} />
+                    <FacePreview project={applyTemplate(tpl.id, project)} />
                   </span>
                   <span>
                     <b>{tpl.name}</b>
@@ -377,14 +451,95 @@ export default function Home() {
             <>
               <section className="panel-section">
                 <div className="section-heading">
+                  <span>ЦЕХ</span>
+                </div>
+                <div className="segmented path-switch">
+                  <button
+                    className={project.shopPath === "strip" ? "selected" : ""}
+                    onClick={() => changePath("strip")}
+                  >
+                    ПАЛКИ
+                  </button>
+                  <button
+                    className={project.shopPath === "block" ? "selected" : ""}
+                    onClick={() => changePath("block")}
+                  >
+                    ШАШКИ
+                  </button>
+                </div>
+              </section>
+
+              <section className="panel-section">
+                <div className="section-heading">
                   <span>ГЕНЕРАТОР</span>
                   <WandSparkles size={14} />
                 </div>
                 <Button className="generate-button" onClick={generate}>
                   <WandSparkles size={16} /> Собрать узор <kbd>G</kbd>
                 </Button>
+                <Button
+                  variant="outline"
+                  className="library-button"
+                  onClick={() => imageRef.current?.click()}
+                >
+                  <ImagePlus size={14} /> Фото на шашки
+                </Button>
               </section>
 
+              {project.shopPath === "block" && (
+                <section className="panel-section">
+                  <div className="section-heading">
+                    <span>ШАШКА / КИСТЬ</span>
+                    <span className="cell-coord">
+                      {derived.blockRows}×{derived.blockCols}
+                    </span>
+                  </div>
+                  <div className="width-chips">
+                    {STANDARD_WIDTHS.map((width) => (
+                      <button
+                        key={width}
+                        type="button"
+                        className={project.blockSize === width ? "chosen" : ""}
+                        onClick={() => {
+                          setTemplateId(null);
+                          commit(syncCourses({ ...project, blockSize: width }));
+                        }}
+                      >
+                        {width}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="width-field block-size-field">
+                    <UnitField
+                      valueMm={project.blockSize}
+                      unit={unit}
+                      onMm={(blockSize) => {
+                        setTemplateId(null);
+                        commit(syncCourses({ ...project, blockSize }));
+                      }}
+                    />
+                    <span>{unitShort}</span>
+                  </div>
+                  <div className="swatches brush-swatches">
+                    {project.species.map((sp) => (
+                      <button
+                        key={sp.id}
+                        type="button"
+                        className={`swatch ${brushId === sp.id ? "swatch-active" : ""}`}
+                        style={{ background: sp.color }}
+                        onClick={() => setBrushId(sp.id)}
+                        aria-label={sp.name}
+                      >
+                        <b>{sp.code}</b>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="material-note">На 2D лице крась выбранной породой.</p>
+                </section>
+              )}
+
+              {project.shopPath === "strip" && (
+              <>
               <section className="panel-section">
                 <div className="section-heading">
                   <span>ПАЛКИ</span>
@@ -395,7 +550,7 @@ export default function Home() {
                       if (!speciesId) return;
                       patchSticksBoard((p) => ({
                         ...p,
-                        sticks: [...p.sticks, { speciesId, width: 35 }],
+                        sticks: [...p.sticks, { speciesId, width: DEFAULT_STICK_WIDTH }],
                       }));
                     }}
                   >
@@ -488,6 +643,8 @@ export default function Home() {
                   </div>
                 ))}
               </section>
+              </>
+              )}
 
               <section className="panel-section">
                 <div className="section-heading">
@@ -605,7 +762,8 @@ export default function Home() {
         </div>
         <div>
           <span className="status-key">КЕРФ</span> {formatLength(project.kerf, unit)}
-          <span className="status-key">ПОЛОСЫ</span> {derived.stripCount}
+          <span className="status-key">{project.shopPath === "block" ? "ШАШКИ" : "ПОЛОСЫ"}</span>{" "}
+          {project.shopPath === "block" ? `${derived.blockRows}×${derived.blockCols}` : derived.stripCount}
         </div>
         <div className="footer-right">
           <span className="status-key">ЕДИНИЦЫ</span>

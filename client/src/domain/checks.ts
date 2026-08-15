@@ -5,27 +5,57 @@ export function evaluateChecks(project: Project): Check[] {
   const derived = derive(project);
   const out: Check[] = [];
 
-  if (project.sticks.length === 0 || project.sticks.some((s) => s.width <= 0)) {
-    out.push({
-      level: "refuse",
-      code: "empty-sticks",
-      message: "Нет палок или ширина ≤ 0 — пилить нечего.",
-    });
-  }
-
-  for (const stick of project.sticks) {
-    if (stick.width > 0 && stick.width < 12) {
+  if (project.shopPath === "block") {
+    if (project.blockSize <= 0 || derived.blockCols === 0 || derived.blockRows === 0) {
       out.push({
         level: "refuse",
-        code: "stick-too-narrow",
-        message: `Палка ${stick.width} мм уже 12 мм — так не клеят.`,
+        code: "empty-blocks",
+        message: "Нет шашек — сторона слишком велика или равна нулю.",
       });
-    } else if (stick.width > 0 && stick.width < 18) {
+    }
+    if (project.blockSize > 0 && project.blockSize < 12) {
+      out.push({
+        level: "refuse",
+        code: "block-too-small",
+        message: `Шашка ${project.blockSize} мм уже 12 мм — так не клеят.`,
+      });
+    } else if (project.blockSize > 0 && project.blockSize < 18) {
       out.push({
         level: "warn",
-        code: "stick-fiddly",
-        message: `Палка ${stick.width} мм — узко, возиться будете.`,
+        code: "block-fiddly",
+        message: `Шашка ${project.blockSize} мм — узко, возиться будете.`,
       });
+    }
+    if (project.courses.length === 0 && derived.blockCols > 0 && derived.blockRows > 0) {
+      out.push({
+        level: "refuse",
+        code: "empty-courses",
+        message: "Сетка шашек пустая — пилить нечего.",
+      });
+    }
+  } else {
+    if (project.sticks.length === 0 || project.sticks.some((s) => s.width <= 0)) {
+      out.push({
+        level: "refuse",
+        code: "empty-sticks",
+        message: "Нет палок или ширина ≤ 0 — пилить нечего.",
+      });
+    }
+
+    for (const stick of project.sticks) {
+      if (stick.width > 0 && stick.width < 12) {
+        out.push({
+          level: "refuse",
+          code: "stick-too-narrow",
+          message: `Палка ${stick.width} мм уже 12 мм — так не клеят.`,
+        });
+      } else if (stick.width > 0 && stick.width < 18) {
+        out.push({
+          level: "warn",
+          code: "stick-fiddly",
+          message: `Палка ${stick.width} мм — узко, возиться будете.`,
+        });
+      }
     }
   }
 
@@ -49,13 +79,15 @@ export function evaluateChecks(project: Project): Check[] {
     });
   }
 
-  const needed = derived.stripCount * derived.crosscutWidth + derived.stripCount * project.kerf;
-  if (derived.stripCount > 0 && derived.blank.length < needed) {
-    out.push({
-      level: "refuse",
-      code: "short-blank",
-      message: "Заготовка короче, чем торцовки плюс керф.",
-    });
+  if (project.shopPath !== "block") {
+    const needed = derived.stripCount * derived.crosscutWidth + derived.stripCount * project.kerf;
+    if (derived.stripCount > 0 && derived.blank.length < needed) {
+      out.push({
+        level: "refuse",
+        code: "short-blank",
+        message: "Заготовка короче, чем торцовки плюс керф.",
+      });
+    }
   }
 
   if (project.kerf < 0) {
@@ -72,7 +104,10 @@ export function evaluateChecks(project: Project): Check[] {
     });
   }
 
-  const used = new Set(project.sticks.map((s) => s.speciesId));
+  const used =
+    project.shopPath === "block"
+      ? new Set(project.courses.flat())
+      : new Set(project.sticks.map((s) => s.speciesId));
   if (used.size > 4) {
     out.push({
       level: "warn",
@@ -105,11 +140,23 @@ export function evaluateChecks(project: Project): Check[] {
     });
   }
 
-  if (derived.stickSum > 0 && Math.abs(derived.stickSum - project.board.width) > 5) {
+  if (
+    project.shopPath !== "block" &&
+    derived.stickSum > 0 &&
+    Math.abs(derived.stickSum - project.board.width) > 5
+  ) {
     out.push({
       level: "warn",
       code: "width-mismatch",
       message: `Сумма палок ${derived.stickSum} мм, ширина доски ${project.board.width} мм.`,
+    });
+  }
+
+  if (project.shopPath === "block" && (derived.remainderX > 0 || derived.remainderY > 0)) {
+    out.push({
+      level: "warn",
+      code: "block-remainder",
+      message: `По краю остаётся поле ${derived.remainderX} × ${derived.remainderY} мм.`,
     });
   }
 
