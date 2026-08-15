@@ -1,7 +1,7 @@
 import { syncCourses } from "./blocks";
 import { DEFAULT_BLOCK_SIZE, emptyProject, SPECIES } from "./defaults";
 import { syncStrips } from "./derive";
-import type { Project, ShopPath, Species, Stick, StripOp } from "./types";
+import type { Project, ShopPath, Species, Stick, StripOp, Unit } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -100,6 +100,14 @@ export function loadProject(storage: Pick<Storage, "getItem">, key: string): Pro
 
 export function saveProject(storage: Pick<Storage, "setItem">, key: string, project: Project): void {
   storage.setItem(key, serializeProject(project));
+}
+
+export function loadUnit(storage: Pick<Storage, "getItem">, key: string): Unit {
+  return storage.getItem(key) === "in" ? "in" : "mm";
+}
+
+export function saveUnit(storage: Pick<Storage, "setItem">, key: string, unit: Unit): void {
+  storage.setItem(key, unit);
 }
 
 export function downloadProject(project: Project): void {

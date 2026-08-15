@@ -1,22 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
 import {
   AlertTriangle,
-  Box,
   Check,
   Download,
   FolderOpen,
-  Grid3X3,
   ImageDown,
   ImagePlus,
   Maximize2,
   Minus,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
-  Printer,
   Save,
-  Scissors,
+  ScrollText,
   WandSparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,10 +24,13 @@ import {
   evaluateChecks,
   hasRefuse,
   loadProject,
+  loadUnit,
   saveProject,
+  saveUnit,
   downloadProject,
   parseProject,
   STORAGE_KEY,
+  UNIT_KEY,
   formatLength,
   fromDisplay,
   toDisplay,
@@ -51,7 +50,6 @@ import {
   type Unit,
 } from "@/domain";
 import { BoardStage } from "@/components/desk/BoardStage";
-import { Instruction } from "@/components/desk/Instruction";
 import { FacePreview } from "@/components/desk/FacePreview";
 
 const DEFAULT_ROTATION = { x: 18, y: -22 };
@@ -59,8 +57,6 @@ const HINT_KERF = 3.2;
 const HINT_SURFACING = 2;
 const HINT_EXTRA = 20;
 const HINT_SQUARE = 10;
-
-type Tab = "pattern" | "build";
 
 function readMm(raw: string, unit: Unit): number | null {
   if (raw.trim() === "") return 0;
@@ -137,18 +133,17 @@ async function pixelsFromFile(file: File): Promise<{ width: number; height: numb
 }
 
 export default function Home() {
+  const [, setLocation] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
   const [project, setProject] = useState<Project>(
     () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
   );
-  const [unit, setUnit] = useState<Unit>("mm");
+  const [unit, setUnit] = useState<Unit>(() => loadUnit(sessionStorage, UNIT_KEY));
   const [seed, setSeed] = useState(1);
   const [saved, setSaved] = useState(false);
   const [view3d, setView3d] = useState(false);
   const [rotation, setRotation] = useState(DEFAULT_ROTATION);
-  const [activeTab, setActiveTab] = useState<Tab>("pattern");
-  const [railOpen, setRailOpen] = useState(true);
   const [templateId, setTemplateId] = useState<TemplateId | null>("stripes");
   const [brushId, setBrushId] = useState("walnut");
 
@@ -247,6 +242,17 @@ export default function Home() {
 
   const resetCamera = () => setRotation({ ...DEFAULT_ROTATION });
 
+  const changeUnit = (next: Unit) => {
+    setUnit(next);
+    saveUnit(sessionStorage, UNIT_KEY, next);
+  };
+
+  const openSheet = () => {
+    saveProject(localStorage, STORAGE_KEY, project);
+    saveUnit(sessionStorage, UNIT_KEY, unit);
+    setLocation("/instruction");
+  };
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "g") return;
@@ -337,39 +343,6 @@ export default function Home() {
       />
 
       <div className="workspace">
-        <aside className={`left-rail ${railOpen ? "" : "closed"}`}>
-          <button className="rail-toggle" onClick={() => setRailOpen(!railOpen)} aria-label="Свернуть рейку">
-            {railOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
-          </button>
-          {railOpen && (
-            <>
-              <div className="rail-label">СТОЛ</div>
-              <button
-                className={`rail-item ${activeTab === "pattern" ? "active" : ""}`}
-                onClick={() => setActiveTab("pattern")}
-              >
-                <Grid3X3 size={18} />
-                <span>Узор</span>
-                <kbd>1</kbd>
-              </button>
-              <button
-                className={`rail-item ${activeTab === "build" ? "active" : ""}`}
-                onClick={() => setActiveTab("build")}
-              >
-                <Scissors size={18} />
-                <span>Инструкция</span>
-                <kbd>2</kbd>
-              </button>
-              <div className="rail-label rail-label-spaced">ВИД</div>
-              <button className="rail-item" onClick={() => setView3d((v) => !v)}>
-                <Box size={18} />
-                <span>3D</span>
-                <i className={`toggle-dot ${view3d ? "on" : ""}`} />
-              </button>
-            </>
-          )}
-        </aside>
-
         <main className="main-area">
           <div className="canvas-toolbar">
             <div>
@@ -438,17 +411,6 @@ export default function Home() {
         </main>
 
         <aside className="inspector">
-          <div className="inspector-tabs">
-            <button className={activeTab === "pattern" ? "active" : ""} onClick={() => setActiveTab("pattern")}>
-              УЗОР
-            </button>
-            <button className={activeTab === "build" ? "active" : ""} onClick={() => setActiveTab("build")}>
-              ИНСТРУКЦИЯ
-            </button>
-          </div>
-
-          {activeTab === "pattern" && (
-            <>
               <section className="panel-section">
                 <div className="section-heading">
                   <span>ЦЕХ</span>
@@ -749,10 +711,6 @@ export default function Home() {
                   </label>
                 </div>
               </section>
-            </>
-          )}
-
-          {activeTab === "build" && <Instruction project={project} unit={unit} />}
         </aside>
       </div>
 
@@ -761,29 +719,32 @@ export default function Home() {
           <span className="status-key">ПРОЕКТ</span> {project.name}
         </div>
         <div>
-          <span className="status-key">КЕРФ</span> {formatLength(project.kerf, unit)}
-          <span className="status-key">{project.shopPath === "block" ? "ШАШКИ" : "ПОЛОСЫ"}</span>{" "}
-          {project.shopPath === "block" ? `${derived.blockRows}×${derived.blockCols}` : derived.stripCount}
+          <span className="status-key">ОТХОД</span>{" "}
+          {derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`}
+          {project.shopPath === "block" ? (
+            <>
+              <span className="status-key">ШАШКИ</span> {derived.blockRows}×{derived.blockCols}
+            </>
+          ) : (
+            <>
+              <span className="status-key">ЗАГОТОВКА</span>{" "}
+              {formatLength(derived.blank.length, unit)} × {formatLength(derived.blank.width, unit)} ×{" "}
+              {formatLength(derived.blank.thickness, unit)}
+            </>
+          )}
         </div>
         <div className="footer-right">
           <span className="status-key">ЕДИНИЦЫ</span>
           <div className="unit-switch">
-            <button className={`unit-toggle ${unit === "mm" ? "selected" : ""}`} onClick={() => setUnit("mm")}>
+            <button className={`unit-toggle ${unit === "mm" ? "selected" : ""}`} onClick={() => changeUnit("mm")}>
               MM
             </button>
-            <button className={`unit-toggle ${unit === "in" ? "selected" : ""}`} onClick={() => setUnit("in")}>
+            <button className={`unit-toggle ${unit === "in" ? "selected" : ""}`} onClick={() => changeUnit("in")}>
               ДЮЙМ
             </button>
           </div>
-          <button
-            onClick={() => {
-              setActiveTab("build");
-              requestAnimationFrame(() => window.print());
-            }}
-            className="footer-action"
-            disabled={refuse}
-          >
-            <Printer size={13} /> ПЕЧАТЬ
+          <button onClick={openSheet} className="footer-action">
+            <ScrollText size={13} /> ЛИСТ
           </button>
         </div>
       </footer>

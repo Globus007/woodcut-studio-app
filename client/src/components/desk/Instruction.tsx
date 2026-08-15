@@ -7,8 +7,10 @@ import {
   DEFAULT_SURFACING,
   derive,
   evaluateChecks,
+  faceRow,
   formatLength,
   hasRefuse,
+  speciesColor,
 } from "@/domain";
 import type { Project, Unit } from "@/domain";
 
@@ -21,6 +23,109 @@ function speciesName(project: Project, speciesId: string): string {
   return project.species.find((s) => s.id === speciesId)?.name ?? speciesId;
 }
 
+function usedSpeciesIds(project: Project): string[] {
+  const source = project.shopPath === "block" ? project.courses.flat() : project.sticks.map((stick) => stick.speciesId);
+  const ids: string[] = [];
+  for (const id of source) {
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+function courseRuns(project: Project, course: string[]): string {
+  const runs: string[] = [];
+  let last = "";
+  let n = 0;
+  for (const id of course) {
+    if (id === last) n += 1;
+    else {
+      if (last) runs.push(`${speciesName(project, last)} ${n}`);
+      last = id;
+      n = 1;
+    }
+  }
+  if (last) runs.push(`${speciesName(project, last)} ${n}`);
+  return runs.join(" · ");
+}
+
+function StickOrderMap(props: { project: Project; unit: Unit }): JSX.Element {
+  const { project, unit } = props;
+  if (project.sticks.length === 0) {
+    return <p className="sheet-empty">Палок нет</p>;
+  }
+  return (
+    <div className="sheet-map" aria-label="Порядок палок поколения 1">
+      {project.sticks.map((stick, index) => (
+        <div
+          key={`${stick.speciesId}-${index}`}
+          className="sheet-map-cell"
+          style={{ flexGrow: Math.max(stick.width, 1), background: speciesColor(project, stick.speciesId) }}
+        >
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <b>{speciesName(project, stick.speciesId)}</b>
+          <small>{formatLength(stick.width, unit)}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StripMap(props: { project: Project; unit: Unit; count: number }): JSX.Element {
+  const { project, unit, count } = props;
+  if (count === 0) {
+    return <p className="sheet-empty">Ломтей нет</p>;
+  }
+  return (
+    <div className="sheet-rows" aria-label="Карта ломтей поколения 2">
+      {Array.from({ length: count }, (_, index) => {
+        const strip = project.strips[index] ?? { flip: false, offset: 0 };
+        const row = faceRow(project, index);
+        return (
+          <div className="sheet-row" key={index}>
+            <span className="sheet-row-num">{String(index + 1).padStart(2, "0")}</span>
+            <div className="sheet-row-bar">
+              {row.map((cell, x) => (
+                <span
+                  key={`${index}-${x}`}
+                  style={{ flexGrow: Math.max(cell.width, 1), background: speciesColor(project, cell.speciesId) }}
+                />
+              ))}
+            </div>
+            <div className="sheet-row-meta">
+              <b>{strip.flip ? "переворот" : "как есть"}</b>
+              <span>сдвиг {formatLength(strip.offset, unit)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function CourseMap(props: { project: Project }): JSX.Element {
+  const { project } = props;
+  if (project.courses.length === 0) {
+    return <p className="sheet-empty">Рядов нет</p>;
+  }
+  return (
+    <div className="sheet-rows" aria-label="Карта рядов">
+      {project.courses.map((course, index) => (
+        <div className="sheet-row" key={index}>
+          <span className="sheet-row-num">{String(index + 1).padStart(2, "0")}</span>
+          <div className="sheet-row-bar">
+            {course.map((id, col) => (
+              <span key={`${index}-${col}`} style={{ flexGrow: 1, background: speciesColor(project, id) }} />
+            ))}
+          </div>
+          <div className="sheet-row-meta">
+            <span>{courseRuns(project, course)}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function Instruction(props: {
   project: Project;
   unit: Unit;
@@ -30,265 +135,208 @@ export function Instruction(props: {
   const checks = evaluateChecks(project);
   const refused = hasRefuse(checks);
   const warnings = checks.filter((check) => check.level === "warn");
-  const usedIds: string[] = [];
-  const source = project.shopPath === "block" ? project.courses.flat() : project.sticks.map((stick) => stick.speciesId);
-  for (const id of source) {
-    if (!usedIds.includes(id)) usedIds.push(id);
-  }
+  const usedIds = usedSpeciesIds(project);
   const blockPath = project.shopPath === "block";
-  const wasteText =
-    derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`;
+  const wasteText = derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`;
   const unitLabel = unit === "in" ? "дюймы" : "миллиметры";
 
   return (
-    <article id="shop-instruction">
+    <article id="shop-instruction" className="sheet-doc">
       {refused && (
-        <section className="panel-section">
-          <div className="stat-line">
-            <span>Печать запрещена</span>
-            <b>проверка не пройдена</b>
-          </div>
-        </section>
+        <p className="sheet-refuse">Печать запрещена — проверка не пройдена.</p>
       )}
 
-      <section className="panel-section">
-        <div className="section-heading">
-          <span>ДОСКА</span>
+      <header className="sheet-head">
+        <div>
+          <p className="sheet-kicker">SHOP INSTRUCTION</p>
+          <h1>{project.name}</h1>
+          <p className="sheet-sub">{blockPath ? "шашки → ряды → щит" : "палки → ломти"}</p>
         </div>
-        <div className="stat-line">
-          <span>Имя</span>
-          <b>{project.name}</b>
-        </div>
-        <div className="stat-line">
-          <span>Цех</span>
-          <b>{blockPath ? "шашки → ряды → щит" : "палки → ломти"}</b>
-        </div>
-        <div className="stat-line">
-          <span>Готовый размер Д × Ш × Т</span>
-          <b>
-            {formatLength(project.board.length, unit)} × {formatLength(project.board.width, unit)} ×{" "}
-            {formatLength(project.board.thickness, unit)}
-          </b>
-        </div>
-        <div className="stat-line">
-          <span>Единицы</span>
-          <b>{unitLabel}</b>
-        </div>
-      </section>
-
-      <section className="panel-section">
-        <div className="section-heading">
-          <span>ЛИЦО</span>
-        </div>
-        <div className="instruction-face">
-          <FacePreview project={project} />
-        </div>
-      </section>
-
-      <section className="panel-section">
-        <div className="section-heading">
-          <span>ПОРОДЫ</span>
-        </div>
-        {usedIds.length === 0 ? (
-          <div className="stat-line">
-            <span>В узоре</span>
-            <b>нет</b>
+        <dl className="sheet-facts">
+          <div>
+            <dt>Готовый размер</dt>
+            <dd>
+              {formatLength(project.board.length, unit)} × {formatLength(project.board.width, unit)} ×{" "}
+              {formatLength(project.board.thickness, unit)}
+            </dd>
           </div>
-        ) : (
-          usedIds.map((id) => (
-            <div className="stat-line" key={id}>
-              <span>{speciesName(project, id)}</span>
-              <b>{project.species.find((s) => s.id === id)?.code ?? id}</b>
-            </div>
-          ))
-        )}
-      </section>
+          <div>
+            <dt>Единицы</dt>
+            <dd>{unitLabel}</dd>
+          </div>
+        </dl>
+      </header>
+
+      <div className="sheet-split">
+        <section>
+          <h2>Лицо</h2>
+          <div className="sheet-face">
+            <FacePreview project={project} />
+          </div>
+        </section>
+        <section>
+          <h2>Породы</h2>
+          {usedIds.length === 0 ? (
+            <p className="sheet-empty">В узоре нет пород</p>
+          ) : (
+            <ul className="sheet-species">
+              {usedIds.map((id) => {
+                const spec = project.species.find((s) => s.id === id);
+                return (
+                  <li key={id}>
+                    <i style={{ background: spec?.color ?? "#888" }} />
+                    <span>{spec?.name ?? id}</span>
+                    <b>{spec?.code ?? id}</b>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
 
       {blockPath ? (
         <>
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>ШАШКИ</span>
-            </div>
-            <div className="stat-line">
-              <span>Сторона шашки</span>
-              <b>{formatLength(project.blockSize, unit)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Сетка ряды × столбцы</span>
-              <b>
-                {derived.blockRows} × {derived.blockCols}
-              </b>
-            </div>
-            {(derived.remainderX > 0 || derived.remainderY > 0) && (
-              <div className="stat-line">
-                <span>Поле по краю</span>
-                <b>
-                  {formatLength(derived.remainderX, unit)} × {formatLength(derived.remainderY, unit)}
-                </b>
+          <section>
+            <h2>Шашки</h2>
+            <dl className="sheet-stats">
+              <div>
+                <dt>Сторона шашки</dt>
+                <dd>{formatLength(project.blockSize, unit)}</dd>
               </div>
-            )}
-            <div className="stat-line">
-              <span>Керф</span>
-              <b>{labeledLength(project.kerf, unit, project.kerf === DEFAULT_KERF)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Запас по длине</span>
-              <b>{labeledLength(project.extraLength, unit, project.extraLength === DEFAULT_EXTRA_LENGTH)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Припуск на фуговку</span>
-              <b>{labeledLength(project.surfacing, unit, project.surfacing === DEFAULT_SURFACING)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Выравнивание</span>
-              <b>{labeledLength(project.squareUp, unit, project.squareUp === DEFAULT_SQUARE_UP)}</b>
-            </div>
-          </section>
-
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>РЯДЫ</span>
-              <span>{derived.blockRows}</span>
-            </div>
-            {project.courses.map((course, index) => {
-              const runs: string[] = [];
-              let last = "";
-              let n = 0;
-              for (const id of course) {
-                if (id === last) n += 1;
-                else {
-                  if (last) runs.push(`${speciesName(project, last)} ${n}`);
-                  last = id;
-                  n = 1;
-                }
-              }
-              if (last) runs.push(`${speciesName(project, last)} ${n}`);
-              return (
-                <div className="step" key={index}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  {runs.join(" · ")}
+              <div>
+                <dt>Сетка ряды × столбцы</dt>
+                <dd>
+                  {derived.blockRows} × {derived.blockCols}
+                </dd>
+              </div>
+              {(derived.remainderX > 0 || derived.remainderY > 0) && (
+                <div>
+                  <dt>Поле по краю</dt>
+                  <dd>
+                    {formatLength(derived.remainderX, unit)} × {formatLength(derived.remainderY, unit)}
+                  </dd>
                 </div>
-              );
-            })}
+              )}
+              <div>
+                <dt>Керф</dt>
+                <dd>{labeledLength(project.kerf, unit, project.kerf === DEFAULT_KERF)}</dd>
+              </div>
+              <div>
+                <dt>Запас по длине</dt>
+                <dd>{labeledLength(project.extraLength, unit, project.extraLength === DEFAULT_EXTRA_LENGTH)}</dd>
+              </div>
+              <div>
+                <dt>Припуск на фуговку</dt>
+                <dd>{labeledLength(project.surfacing, unit, project.surfacing === DEFAULT_SURFACING)}</dd>
+              </div>
+              <div>
+                <dt>Выравнивание</dt>
+                <dd>{labeledLength(project.squareUp, unit, project.squareUp === DEFAULT_SQUARE_UP)}</dd>
+              </div>
+            </dl>
+          </section>
+          <section>
+            <h2>Ряды · {derived.blockRows}</h2>
+            <CourseMap project={project} />
           </section>
         </>
       ) : (
         <>
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>ПОКОЛЕНИЕ 1</span>
-            </div>
-            {project.sticks.map((stick, index) => (
-              <div className="step" key={`${stick.speciesId}-${index}`}>
-                <span>{String(index + 1).padStart(2, "0")}</span>
-                {speciesName(project, stick.speciesId)} · {formatLength(stick.width, unit)}
+          <section>
+            <h2>Поколение 1</h2>
+            <StickOrderMap project={project} unit={unit} />
+            <dl className="sheet-stats">
+              <div>
+                <dt>Заготовка Д × Ш × Т</dt>
+                <dd>
+                  {formatLength(derived.blank.length, unit)} × {formatLength(derived.blank.width, unit)} ×{" "}
+                  {formatLength(derived.blank.thickness, unit)}
+                </dd>
               </div>
-            ))}
-            <div className="stat-line">
-              <span>Заготовка Д × Ш × Т</span>
-              <b>
-                {formatLength(derived.blank.length, unit)} × {formatLength(derived.blank.width, unit)} ×{" "}
-                {formatLength(derived.blank.thickness, unit)}
-              </b>
-            </div>
-            <div className="stat-line">
-              <span>Керф</span>
-              <b>{labeledLength(project.kerf, unit, project.kerf === DEFAULT_KERF)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Запас по длине</span>
-              <b>{labeledLength(project.extraLength, unit, project.extraLength === DEFAULT_EXTRA_LENGTH)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Припуск на фуговку</span>
-              <b>{labeledLength(project.surfacing, unit, project.surfacing === DEFAULT_SURFACING)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Выравнивание</span>
-              <b>{labeledLength(project.squareUp, unit, project.squareUp === DEFAULT_SQUARE_UP)}</b>
-            </div>
-          </section>
-
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>ТОРЦОВКА</span>
-            </div>
-            <div className="stat-line">
-              <span>Ширина реза</span>
-              <b>{formatLength(derived.crosscutWidth, unit)}</b>
-            </div>
-            <div className="stat-line">
-              <span>Полос</span>
-              <b>{derived.stripCount}</b>
-            </div>
-            {derived.remainder !== 0 && (
-              <div className="stat-line">
-                <span>Остаток</span>
-                <b>{formatLength(derived.remainder, unit)}</b>
+              <div>
+                <dt>Керф</dt>
+                <dd>{labeledLength(project.kerf, unit, project.kerf === DEFAULT_KERF)}</dd>
               </div>
-            )}
+              <div>
+                <dt>Запас по длине</dt>
+                <dd>{labeledLength(project.extraLength, unit, project.extraLength === DEFAULT_EXTRA_LENGTH)}</dd>
+              </div>
+              <div>
+                <dt>Припуск на фуговку</dt>
+                <dd>{labeledLength(project.surfacing, unit, project.surfacing === DEFAULT_SURFACING)}</dd>
+              </div>
+              <div>
+                <dt>Выравнивание</dt>
+                <dd>{labeledLength(project.squareUp, unit, project.squareUp === DEFAULT_SQUARE_UP)}</dd>
+              </div>
+            </dl>
           </section>
-
-          <section className="panel-section">
-            <div className="section-heading">
-              <span>ПОКОЛЕНИЕ 2</span>
-              <span>{derived.stripCount}</span>
-            </div>
-            {Array.from({ length: derived.stripCount }, (_, index) => {
-              const strip = project.strips[index] ?? { flip: false, offset: 0 };
-              return (
-                <div className="step" key={index}>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  переворот {strip.flip ? "да" : "нет"} · сдвиг {formatLength(strip.offset, unit)}
+          <section>
+            <h2>Торцовка</h2>
+            <dl className="sheet-stats">
+              <div>
+                <dt>Ширина реза</dt>
+                <dd>{formatLength(derived.crosscutWidth, unit)}</dd>
+              </div>
+              <div>
+                <dt>Полос</dt>
+                <dd>{derived.stripCount}</dd>
+              </div>
+              {derived.remainder !== 0 && (
+                <div>
+                  <dt>Остаток</dt>
+                  <dd>{formatLength(derived.remainder, unit)}</dd>
                 </div>
-              );
-            })}
+              )}
+            </dl>
+          </section>
+          <section>
+            <h2>Поколение 2 · {derived.stripCount}</h2>
+            <StripMap project={project} unit={unit} count={derived.stripCount} />
           </section>
         </>
       )}
 
-      <section className="panel-section">
-        <div className="section-heading">
-          <span>РАСКРОЙ</span>
-        </div>
-        {derived.takeoff.map((row, index) => (
-          <div className="stat-line" key={`${row.speciesId}-${index}`}>
-            <span>
-              {row.speciesName} · {formatLength(row.width, unit)}
-              {row.blocks > 0 ? ` · ${row.blocks} шаш.` : ""}
-            </span>
-            <b>{formatLength(row.length, unit)}</b>
-          </div>
-        ))}
-        <div className="stat-line">
-          <span>Отход</span>
-          <b>{wasteText}</b>
-        </div>
+      <section>
+        <h2>Раскрой</h2>
+        <table className="sheet-takeoff">
+          <thead>
+            <tr>
+              <th>Порода</th>
+              <th>Ширина</th>
+              <th>Длина</th>
+              {blockPath ? <th>Шашки</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {derived.takeoff.map((row, index) => (
+              <tr key={`${row.speciesId}-${index}`}>
+                <td>{row.speciesName}</td>
+                <td>{formatLength(row.width, unit)}</td>
+                <td>{formatLength(row.length, unit)}</td>
+                {blockPath ? <td>{row.blocks > 0 ? row.blocks : "—"}</td> : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="sheet-waste">
+          Отход <b>{wasteText}</b>
+        </p>
       </section>
 
-      <section className="panel-section">
-        <div className="section-heading">
-          <span>ПРЕДУПРЕЖДЕНИЯ</span>
-        </div>
+      <section>
+        <h2>Предупреждения</h2>
         {warnings.length === 0 ? (
-          <div className="stat-line">
-            <span>Предупреждений нет</span>
-            <b>—</b>
-          </div>
+          <p className="sheet-empty">Предупреждений нет</p>
         ) : (
-          warnings.map((check, index) => (
-            <div className="stat-line" key={`${check.code}-${index}`}>
-              <span>{check.message}</span>
-            </div>
-          ))
+          <ul className="sheet-warns">
+            {warnings.map((check, index) => (
+              <li key={`${check.code}-${index}`}>{check.message}</li>
+            ))}
+          </ul>
         )}
-      </section>
-
-      <section className="panel-section">
-        <div className="stat-line">
-          <span>Торцы через рейсмус рвутся — подпорный брусок или ручной рубанок.</span>
-        </div>
+        <p className="sheet-caution">Торцы через рейсмус рвутся — подпорный брусок или ручной рубанок.</p>
       </section>
     </article>
   );

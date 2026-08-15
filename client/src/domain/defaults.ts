@@ -1,6 +1,7 @@
 import type { Project, Species } from "./types";
 
 export const STORAGE_KEY = "woodcut-project-v1";
+export const UNIT_KEY = "woodcut-unit";
 
 export const SPECIES: Species[] = [
   { id: "walnut", name: "Орех", code: "ORE", color: "#6f4735" },

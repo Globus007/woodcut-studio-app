@@ -73,5 +73,5 @@ Derived leftover: stock volume minus finished volume, as a percentage. Kerf, sur
 _Avoid_: a mood formula, contingency percent
 
 **Shop instruction**:
-The one printable document of the construction sequence. The on-desk Build view is that document.
-_Avoid_: worksheet of the whole UI, invoice
+The one printable document of the construction sequence. The carpenter reads and prints it on its own sheet page, not in a desk pane.
+_Avoid_: worksheet of the whole UI, invoice, Build view as a third desk pane

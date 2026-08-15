@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { applyTemplate } from "./templates";
-import { parseProject, serializeProject } from "./persist";
+import { loadUnit, parseProject, saveUnit, serializeProject } from "./persist";
 
 describe("project file", () => {
   it("round-trips a template", () => {
@@ -23,5 +23,18 @@ describe("project file", () => {
 
   it("rejects a foreign version", () => {
     expect(parseProject(JSON.stringify({ version: 2, name: "x" }))).toBeNull();
+  });
+
+  it("reads units from storage", () => {
+    const store = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+    };
+    expect(loadUnit(storage, "u")).toBe("mm");
+    saveUnit(storage, "u", "in");
+    expect(loadUnit(storage, "u")).toBe("in");
   });
 });
