@@ -28,6 +28,7 @@ export type Project = {
   name: string;
   shopPath: ShopPath;
   board: BoardSize;
+  motifWidth: number;
   kerf: number;
   surfacing: number;
   extraLength: number;
@@ -71,8 +72,12 @@ export type FaceCell = {
 export type Derived = {
   motifWidth: number;
   stripCount: number;
+  coverage: number;
   crosscutWidth: number;
-  remainder: number;
+  widthShortfall: number;
+  widthTrim: number;
+  lengthShortfall: number;
+  lengthTrim: number;
   remainderX: number;
   remainderY: number;
   blockCols: number;

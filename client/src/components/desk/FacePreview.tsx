@@ -1,5 +1,5 @@
 import type { PointerEvent } from "react";
-import { blockCols, blockRows, faceGrid, speciesColor, syncCourses, syncStrips } from "@/domain";
+import { blockCols, blockRows, faceRow, speciesColor, syncCourses } from "@/domain";
 import type { Project } from "@/domain";
 
 function cellAt(project: Project, clientX: number, clientY: number, el: HTMLElement): { row: number; col: number } | null {
@@ -63,24 +63,42 @@ export function FacePreview({
     );
   }
 
-  const synced = syncStrips(project);
-  const rows = faceGrid(synced);
+  const length = Math.max(1, project.board.length);
+  const width = Math.max(1, project.board.width);
+  const motif = project.motifWidth;
   return (
-    <div className={className} style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>
-      {rows.map((row, y) => (
-        <div key={y} style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          {row.map((cell, x) => (
+    <div
+      className={className}
+      style={{ position: "relative", width: "100%", height: "100%", background: "#171311" }}
+    >
+      {project.strips.flatMap((_, index) => {
+        const y = index * motif;
+        if (y >= length) return [];
+        const height = Math.min(motif, length - y);
+        const cells = faceRow(project, index);
+        let x = 0;
+        const rects = [];
+        for (let c = 0; c < cells.length && x < width; c += 1) {
+          const cell = cells[c];
+          const cellW = Math.min(cell.width, width - x);
+          rects.push(
             <span
-              key={`${y}-${x}`}
+              key={`${index}-${c}`}
               style={{
-                flex: cell.width,
-                background: speciesColor(synced, cell.speciesId),
+                position: "absolute",
+                left: `${(x / width) * 100}%`,
+                top: `${(y / length) * 100}%`,
+                width: `${(cellW / width) * 100}%`,
+                height: `${(height / length) * 100}%`,
+                background: speciesColor(project, cell.speciesId),
                 boxShadow: "inset 0 0 0 1px rgba(0,0,0,.18)",
               }}
-            />
-          ))}
-        </div>
-      ))}
+            />,
+          );
+          x += cellW;
+        }
+        return rects;
+      })}
     </div>
   );
 }

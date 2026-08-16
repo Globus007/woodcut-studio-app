@@ -42,6 +42,50 @@ export function evaluateChecks(project: Project): Check[] {
       });
     }
 
+    if (project.strips.length === 0) {
+      out.push({
+        level: "refuse",
+        code: "empty-strips",
+        message: "Нет полос — пилить нечего.",
+      });
+    }
+
+    if (project.motifWidth <= 0) {
+      out.push({
+        level: "refuse",
+        code: "unrepresentable",
+        message: "Лицо не собирается из поколения 1 и 2 — так в цех нельзя.",
+      });
+    }
+
+    if (derived.widthShortfall > 0) {
+      out.push({
+        level: "refuse",
+        code: "width-shortfall",
+        message: `Недобор ширины ${derived.widthShortfall} мм — такой доски нет.`,
+      });
+    } else if (derived.widthTrim > 0) {
+      out.push({
+        level: "warn",
+        code: "width-trim",
+        message: `Обрезь ширины ${derived.widthTrim} мм — лицо обрезается от первой палки.`,
+      });
+    }
+
+    if (derived.lengthShortfall > 0) {
+      out.push({
+        level: "refuse",
+        code: "length-shortfall",
+        message: `Недобор длины ${derived.lengthShortfall} мм — такой доски нет.`,
+      });
+    } else if (derived.lengthTrim > 0) {
+      out.push({
+        level: "warn",
+        code: "length-trim",
+        message: `Обрезь длины ${derived.lengthTrim} мм — лицо обрезается от первой полосы.`,
+      });
+    }
+
     for (const stick of project.sticks) {
       if (stick.width > 0 && stick.width < 12) {
         out.push({
@@ -137,18 +181,6 @@ export function evaluateChecks(project: Project): Check[] {
       level: "warn",
       code: "no-extra",
       message: "Запас по длине 0 — зачем резать впритык.",
-    });
-  }
-
-  if (
-    project.shopPath !== "block" &&
-    derived.stickSum > 0 &&
-    Math.abs(derived.stickSum - project.board.width) > 5
-  ) {
-    out.push({
-      level: "warn",
-      code: "width-mismatch",
-      message: `Сумма палок ${derived.stickSum} мм, ширина доски ${project.board.width} мм.`,
     });
   }
 

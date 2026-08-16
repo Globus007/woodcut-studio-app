@@ -16,6 +16,7 @@ export const DEFAULT_SURFACING = 2;
 export const DEFAULT_EXTRA_LENGTH = 20;
 export const DEFAULT_SQUARE_UP = 10;
 export const DEFAULT_BLOCK_SIZE = 20;
+export const DEFAULT_MOTIF_WIDTH = 20;
 export const STANDARD_WIDTHS = [15, 20, 25, 30, 40] as const;
 export const DEFAULT_STICK_WIDTH = 20;
 
@@ -25,6 +26,7 @@ export function emptyProject(name = "Полосы"): Project {
     name,
     shopPath: "strip",
     board: { length: 400, width: 280, thickness: 40 },
+    motifWidth: DEFAULT_MOTIF_WIDTH,
     kerf: DEFAULT_KERF,
     surfacing: DEFAULT_SURFACING,
     extraLength: DEFAULT_EXTRA_LENGTH,

@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from "react";
 import type { JSX } from "react";
 import { FacePreview } from "@/components/desk/FacePreview";
-import { faceGrid, formatLength, speciesColor, syncStrips } from "@/domain";
+import { derive, faceRow, formatLength, speciesColor } from "@/domain";
 import type { Project, Unit } from "@/domain";
 
 const PITCH_MIN = 10;
@@ -60,33 +60,82 @@ export function BoardStage(props: {
   const faceH = Math.max(96, length * px);
   const thick = Math.max(24, thickness * px);
 
+  const derived = useMemo(() => derive(project), [project]);
+
   const edges = useMemo(() => {
-    const synced = syncStrips(project);
-    const grid = faceGrid(synced);
-    const colorOf = (speciesId: string | undefined) => speciesColor(synced, speciesId ?? "");
-    return {
-      west: grid.map((row, i) => ({
+    const hole = "#171311";
+    const colorOf = (speciesId: string | undefined) =>
+      speciesId ? speciesColor(project, speciesId) : hole;
+    if (project.shopPath === "block") {
+      const size = project.blockSize;
+      const courses = project.courses;
+      const west = courses.map((course, i) => ({
         key: `w-${i}`,
-        flex: 1,
-        color: colorOf(row[0]?.speciesId),
-      })),
-      east: grid.map((row, i) => ({
+        flex: size,
+        color: colorOf(course[0]),
+      }));
+      const east = courses.map((course, i) => ({
         key: `e-${i}`,
-        flex: 1,
-        color: colorOf(row[row.length - 1]?.speciesId),
-      })),
-      north: (grid[0] ?? []).map((cell, i) => ({
-        key: `n-${i}`,
-        flex: Math.max(cell.width, 1),
-        color: colorOf(cell.speciesId),
-      })),
-      south: (grid[grid.length - 1] ?? []).map((cell, i) => ({
-        key: `s-${i}`,
-        flex: Math.max(cell.width, 1),
-        color: colorOf(cell.speciesId),
-      })),
+        flex: size,
+        color: colorOf(course[course.length - 1]),
+      }));
+      if (derived.remainderY > 0) {
+        west.push({ key: "w-hole", flex: derived.remainderY, color: hole });
+        east.push({ key: "e-hole", flex: derived.remainderY, color: hole });
+      }
+      const first = courses[0] ?? [];
+      const last = courses[courses.length - 1] ?? [];
+      const north = first.map((id, i) => ({ key: `n-${i}`, flex: size, color: colorOf(id) }));
+      const south =
+        derived.remainderY > 0
+          ? [{ key: "s-hole", flex: 1, color: hole }]
+          : last.map((id, i) => ({ key: `s-${i}`, flex: size, color: colorOf(id) }));
+      if (derived.remainderX > 0 && derived.remainderY === 0) {
+        north.push({ key: "n-hole", flex: derived.remainderX, color: hole });
+        south.push({ key: "s-hole-x", flex: derived.remainderX, color: hole });
+      }
+      return { west, east, north, south };
+    }
+
+    const motif = project.motifWidth;
+    const length = project.board.length;
+    const width = project.board.width;
+    const west: { key: string; flex: number; color: string }[] = [];
+    const east: { key: string; flex: number; color: string }[] = [];
+    let lastVisible = -1;
+    for (let i = 0; i < project.strips.length; i += 1) {
+      const y = i * motif;
+      if (y >= length) break;
+      const h = Math.min(motif, length - y);
+      const row = faceRow(project, i);
+      west.push({ key: `w-${i}`, flex: h, color: colorOf(row[0]?.speciesId) });
+      east.push({ key: `e-${i}`, flex: h, color: colorOf(row[row.length - 1]?.speciesId) });
+      lastVisible = i;
+    }
+    if (derived.lengthShortfall > 0) {
+      west.push({ key: "w-hole", flex: derived.lengthShortfall, color: hole });
+      east.push({ key: "e-hole", flex: derived.lengthShortfall, color: hole });
+    }
+    const clipRow = (row: ReturnType<typeof faceRow>, prefix: string) => {
+      const items: { key: string; flex: number; color: string }[] = [];
+      let x = 0;
+      for (let c = 0; c < row.length && x < width; c += 1) {
+        const take = Math.min(row[c].width, width - x);
+        items.push({ key: `${prefix}-${c}`, flex: take, color: colorOf(row[c].speciesId) });
+        x += take;
+      }
+      if (derived.widthShortfall > 0) {
+        items.push({ key: `${prefix}-hole`, flex: derived.widthShortfall, color: hole });
+      }
+      return items;
     };
-  }, [project]);
+    const north = clipRow(faceRow(project, 0), "n");
+    const south =
+      derived.lengthShortfall > 0
+        ? [{ key: "s-hole", flex: 1, color: hole }]
+        : clipRow(faceRow(project, Math.max(0, lastVisible)), "s");
+    return { west, east, north, south };
+  }, [project, derived]);
 
   const endDrag = (event?: PointerEvent<HTMLDivElement>) => {
     if (event && event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -115,7 +164,6 @@ export function BoardStage(props: {
 
   const lengthLabel = formatLength(length, unit);
   const widthLabel = formatLength(width, unit);
-  const thickLabel = formatLength(thickness, unit);
 
   return (
     <div
@@ -183,25 +231,46 @@ export function BoardStage(props: {
         )}
       </div>
 
-      <div className="dimension dimension-width">
-        <span />
-        <b>{widthLabel}</b>
-        <span />
-      </div>
-      <div className="dimension dimension-height">
-        <span />
-        <b>{lengthLabel}</b>
-        <span />
-      </div>
-      {view3d && (
-        <div className="dimension dimension-thick">
-          <b>T {thickLabel}</b>
+      {!view3d && (
+        <>
+          <div className="dimension dimension-width">
+            <span />
+            <b>{widthLabel}</b>
+            <span />
+          </div>
+          <div className="dimension dimension-height">
+            <span />
+            <b>{lengthLabel}</b>
+            <span />
+          </div>
+        </>
+      )}
+      {project.shopPath === "strip" &&
+        (derived.widthShortfall > 0 ||
+          derived.widthTrim > 0 ||
+          derived.lengthShortfall > 0 ||
+          derived.lengthTrim > 0) && (
+          <div className="face-fit">
+            {derived.widthShortfall > 0 && (
+              <span className="fit-tag shortfall">недобор ширины {formatLength(derived.widthShortfall, unit)}</span>
+            )}
+            {derived.widthTrim > 0 && (
+              <span className="fit-tag trim">обрезь ширины {formatLength(derived.widthTrim, unit)}</span>
+            )}
+            {derived.lengthShortfall > 0 && (
+              <span className="fit-tag shortfall">недобор длины {formatLength(derived.lengthShortfall, unit)}</span>
+            )}
+            {derived.lengthTrim > 0 && (
+              <span className="fit-tag trim">обрезь длины {formatLength(derived.lengthTrim, unit)}</span>
+            )}
+          </div>
+        )}
+
+      {!view3d && (
+        <div className="origin">
+          {lengthLabel} × {widthLabel}
         </div>
       )}
-      <div className="origin">
-        {lengthLabel} × {widthLabel}
-        {view3d ? ` × ${thickLabel}` : ""}
-      </div>
 
       {view3d && (
         <button

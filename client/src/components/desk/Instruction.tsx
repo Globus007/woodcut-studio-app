@@ -3,6 +3,7 @@ import { FacePreview } from "@/components/desk/FacePreview";
 import {
   DEFAULT_EXTRA_LENGTH,
   DEFAULT_KERF,
+  DEFAULT_MOTIF_WIDTH,
   DEFAULT_SQUARE_UP,
   DEFAULT_SURFACING,
   derive,
@@ -134,6 +135,7 @@ export function Instruction(props: {
   const derived = derive(project);
   const checks = evaluateChecks(project);
   const refused = hasRefuse(checks);
+  const refuses = checks.filter((check) => check.level === "refuse");
   const warnings = checks.filter((check) => check.level === "warn");
   const usedIds = usedSpeciesIds(project);
   const blockPath = project.shopPath === "block";
@@ -141,14 +143,22 @@ export function Instruction(props: {
   const unitLabel = unit === "in" ? "дюймы" : "миллиметры";
 
   return (
-    <article id="shop-instruction" className="sheet-doc">
+    <article id="shop-instruction" className={`sheet-doc${refused ? " is-refused" : ""}`}>
       {refused && (
-        <p className="sheet-refuse">Печать запрещена — проверка не пройдена.</p>
+        <div className="sheet-refuse">
+          <p>Печать запрещена — такой доски нет.</p>
+          <ul>
+            {refuses.map((check, index) => (
+              <li key={`${check.code}-${index}`}>{check.message}</li>
+            ))}
+          </ul>
+        </div>
       )}
 
+      <div className="sheet-print-body">
       <header className="sheet-head">
         <div>
-          <p className="sheet-kicker">SHOP INSTRUCTION</p>
+          <p className="sheet-kicker">ЦЕХОВАЯ ИНСТРУКЦИЯ</p>
           <h1>{project.name}</h1>
           <p className="sheet-sub">{blockPath ? "шашки → ряды → щит" : "палки → ломти"}</p>
         </div>
@@ -163,6 +173,10 @@ export function Instruction(props: {
           <div>
             <dt>Единицы</dt>
             <dd>{unitLabel}</dd>
+          </div>
+          <div>
+            <dt>Цех</dt>
+            <dd>{blockPath ? "шашки" : "палки"}</dd>
           </div>
         </dl>
       </header>
@@ -255,6 +269,16 @@ export function Instruction(props: {
                 </dd>
               </div>
               <div>
+                <dt>Ширина мотива</dt>
+                <dd>
+                  {labeledLength(
+                    project.motifWidth,
+                    unit,
+                    project.motifWidth === DEFAULT_MOTIF_WIDTH,
+                  )}
+                </dd>
+              </div>
+              <div>
                 <dt>Керф</dt>
                 <dd>{labeledLength(project.kerf, unit, project.kerf === DEFAULT_KERF)}</dd>
               </div>
@@ -283,10 +307,28 @@ export function Instruction(props: {
                 <dt>Полос</dt>
                 <dd>{derived.stripCount}</dd>
               </div>
-              {derived.remainder !== 0 && (
+              {derived.widthShortfall > 0 && (
                 <div>
-                  <dt>Остаток</dt>
-                  <dd>{formatLength(derived.remainder, unit)}</dd>
+                  <dt>Недобор ширины</dt>
+                  <dd>{formatLength(derived.widthShortfall, unit)}</dd>
+                </div>
+              )}
+              {derived.widthTrim > 0 && (
+                <div>
+                  <dt>Обрезь ширины</dt>
+                  <dd>{formatLength(derived.widthTrim, unit)}</dd>
+                </div>
+              )}
+              {derived.lengthShortfall > 0 && (
+                <div>
+                  <dt>Недобор длины</dt>
+                  <dd>{formatLength(derived.lengthShortfall, unit)}</dd>
+                </div>
+              )}
+              {derived.lengthTrim > 0 && (
+                <div>
+                  <dt>Обрезь длины</dt>
+                  <dd>{formatLength(derived.lengthTrim, unit)}</dd>
                 </div>
               )}
             </dl>
@@ -338,6 +380,7 @@ export function Instruction(props: {
         )}
         <p className="sheet-caution">Торцы через рейсмус рвутся — подпорный брусок или ручной рубанок.</p>
       </section>
+      </div>
     </article>
   );
 }

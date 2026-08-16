@@ -8,6 +8,8 @@ import {
   FolderOpen,
   ImageDown,
   ImagePlus,
+  ChevronDown,
+  ChevronUp,
   Maximize2,
   Minus,
   Plus,
@@ -34,14 +36,17 @@ import {
   formatLength,
   fromDisplay,
   toDisplay,
-  syncStrips,
+  addStrip,
+  removeStrip,
+  moveStrip,
   syncCourses,
   TEMPLATES,
-  faceGrid,
+  faceRow,
   speciesColor,
   setShopPath,
   paintBlock,
   imageToCourses,
+  DEFAULT_MOTIF_WIDTH,
   DEFAULT_STICK_WIDTH,
   STANDARD_WIDTHS,
   type Project,
@@ -66,25 +71,36 @@ function readMm(raw: string, unit: Unit): number | null {
 }
 
 function exportFaceSvg(project: Project) {
-  const rows = faceGrid(project);
-  const w = 800;
-  const h = 480;
-  const rowH = h / Math.max(rows.length, 1);
-  const maxWidth = Math.max(
-    1,
-    project.shopPath === "block"
-      ? project.board.width
-      : project.sticks.reduce((sum, stick) => sum + stick.width, 0),
-  );
-  const rects = rows.flatMap((row, y) => {
-    let x = 0;
-    return row.map((cell) => {
-      const cw = (cell.width / maxWidth) * w;
-      const rect = `<rect x="${x}" y="${y * rowH}" width="${cw}" height="${rowH}" fill="${speciesColor(project, cell.speciesId)}"/>`;
-      x += cw;
-      return rect;
+  const w = Math.max(1, project.board.width);
+  const h = Math.max(1, project.board.length);
+  const rects: string[] = [];
+  if (project.shopPath === "block") {
+    const size = project.blockSize;
+    project.courses.forEach((course, r) => {
+      course.forEach((speciesId, c) => {
+        rects.push(
+          `<rect x="${c * size}" y="${r * size}" width="${size}" height="${size}" fill="${speciesColor(project, speciesId)}"/>`,
+        );
+      });
     });
-  });
+  } else {
+    const motif = project.motifWidth;
+    project.strips.forEach((_, index) => {
+      const y = index * motif;
+      if (y >= h) return;
+      const rowH = Math.min(motif, h - y);
+      const cells = faceRow(project, index);
+      let x = 0;
+      for (const cell of cells) {
+        if (x >= w) break;
+        const cw = Math.min(cell.width, w - x);
+        rects.push(
+          `<rect x="${x}" y="${y}" width="${cw}" height="${rowH}" fill="${speciesColor(project, cell.speciesId)}"/>`,
+        );
+        x += cw;
+      }
+    });
+  }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${rects.join("")}</svg>`;
   const blob = new Blob([svg], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
@@ -139,7 +155,7 @@ export default function Home() {
   const [project, setProject] = useState<Project>(
     () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
   );
-  const [unit, setUnit] = useState<Unit>(() => loadUnit(sessionStorage, UNIT_KEY));
+  const [unit, setUnit] = useState<Unit>(() => loadUnit(localStorage, UNIT_KEY));
   const [seed, setSeed] = useState(1);
   const [saved, setSaved] = useState(false);
   const [view3d, setView3d] = useState(false);
@@ -150,11 +166,11 @@ export default function Home() {
   const derived = useMemo(() => derive(project), [project]);
   const checks = useMemo(() => evaluateChecks(project), [project]);
   const refuse = hasRefuse(checks);
-  const firstRefuse = checks.find((c) => c.level === "refuse");
-  const firstWarn = checks.find((c) => c.level === "warn");
+  const refuses = checks.filter((c) => c.level === "refuse");
+  const warns = checks.filter((c) => c.level === "warn");
   const unitShort = unit === "in" ? "″" : "мм";
 
-  const align = (next: Project) => (next.shopPath === "block" ? syncCourses(next) : syncStrips(next));
+  const align = (next: Project) => (next.shopPath === "block" ? syncCourses(next) : next);
 
   const commit = (next: Project, sync = false) => {
     setProject(sync ? align(next) : next);
@@ -230,10 +246,12 @@ export default function Home() {
         toast.error("Не удалось прочитать снимок");
         return;
       }
-      const onBlock = project.shopPath === "block" ? project : setShopPath(project, "block");
-      if (!onBlock) return;
+      if (project.shopPath !== "block") {
+        toast.error("Фото только на шашки — путь сам не переключается.");
+        return;
+      }
       setTemplateId(null);
-      commit(imageToCourses(onBlock, pixels));
+      commit(imageToCourses(project, pixels));
       toast.success("Фото село на шашки — поправь кистью");
     } catch {
       toast.error("Не удалось прочитать снимок");
@@ -244,12 +262,12 @@ export default function Home() {
 
   const changeUnit = (next: Unit) => {
     setUnit(next);
-    saveUnit(sessionStorage, UNIT_KEY, next);
+    saveUnit(localStorage, UNIT_KEY, next);
   };
 
   const openSheet = () => {
     saveProject(localStorage, STORAGE_KEY, project);
-    saveUnit(sessionStorage, UNIT_KEY, unit);
+    saveUnit(localStorage, UNIT_KEY, unit);
     setLocation("/instruction");
   };
 
@@ -265,12 +283,16 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const statusKind = refuse ? "refuse" : firstWarn ? "warn" : "ok";
-  const statusTitle = refuse ? "Нельзя печатать" : firstWarn ? firstWarn.message : "Можно пилить";
+  const statusKind = refuse ? "refuse" : warns.length ? "warn" : "ok";
+  const statusTitle = refuse
+    ? "Нельзя печатать"
+    : warns.length
+      ? `${warns.length} предупр.`
+      : "Можно пилить";
   const statusDetail = refuse
-    ? firstRefuse?.message ?? "Проверка не пройдена"
-    : firstWarn
-      ? firstWarn.message
+    ? refuses.map((c) => c.message).join(" · ")
+    : warns.length
+      ? warns.map((c) => c.message).join(" · ")
       : "Проверки пройдены · можно в мастерскую";
 
   return (
@@ -439,13 +461,15 @@ export default function Home() {
                 <Button className="generate-button" onClick={generate}>
                   <WandSparkles size={16} /> Собрать узор <kbd>G</kbd>
                 </Button>
-                <Button
-                  variant="outline"
-                  className="library-button"
-                  onClick={() => imageRef.current?.click()}
-                >
-                  <ImagePlus size={14} /> Фото на шашки
-                </Button>
+                {project.shopPath === "block" && (
+                  <Button
+                    variant="outline"
+                    className="library-button"
+                    onClick={() => imageRef.current?.click()}
+                  >
+                    <ImagePlus size={14} /> Фото на шашки
+                  </Button>
+                )}
               </section>
 
               {project.shopPath === "block" && (
@@ -502,6 +526,42 @@ export default function Home() {
 
               {project.shopPath === "strip" && (
               <>
+              <section className="panel-section">
+                <div className="section-heading">
+                  <span>МОТИВ</span>
+                </div>
+                <div className="width-chips">
+                  {STANDARD_WIDTHS.map((width) => (
+                    <button
+                      key={width}
+                      type="button"
+                      className={project.motifWidth === width ? "chosen" : ""}
+                      onClick={() => {
+                        setTemplateId(null);
+                        commit({ ...project, motifWidth: width });
+                      }}
+                    >
+                      {width}
+                    </button>
+                  ))}
+                </div>
+                <div className="width-field block-size-field">
+                  <UnitField
+                    valueMm={project.motifWidth}
+                    unit={unit}
+                    onMm={(motifWidth) => {
+                      setTemplateId(null);
+                      commit({ ...project, motifWidth });
+                    }}
+                  />
+                  <span>{unitShort}</span>
+                </div>
+                <i className="field-hint">
+                  {project.motifWidth === DEFAULT_MOTIF_WIDTH
+                    ? `дефолт ${formatLength(DEFAULT_MOTIF_WIDTH, unit)}`
+                    : "вход"}
+                </i>
+              </section>
               <section className="panel-section">
                 <div className="section-heading">
                   <span>ПАЛКИ</span>
@@ -571,7 +631,9 @@ export default function Home() {
               <section className="panel-section">
                 <div className="section-heading">
                   <span>ПОЛОСЫ</span>
-                  <span className="cell-coord">{project.strips.length}</span>
+                  <button type="button" onClick={() => commit(addStrip(project))}>
+                    <Plus size={12} /> добавить
+                  </button>
                 </div>
                 {project.strips.map((strip, index) => (
                   <div className="strip-row" key={index}>
@@ -602,6 +664,32 @@ export default function Home() {
                       />
                       <span>{unitShort}</span>
                     </div>
+                    <button
+                      type="button"
+                      className="icon-mini"
+                      aria-label={`Полоса ${index + 1} вверх`}
+                      disabled={index === 0}
+                      onClick={() => commit(moveStrip(project, index, index - 1))}
+                    >
+                      <ChevronUp size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-mini"
+                      aria-label={`Полоса ${index + 1} вниз`}
+                      disabled={index === project.strips.length - 1}
+                      onClick={() => commit(moveStrip(project, index, index + 1))}
+                    >
+                      <ChevronDown size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-mini"
+                      aria-label={`Удалить полосу ${index + 1}`}
+                      onClick={() => commit(removeStrip(project, index))}
+                    >
+                      <Minus size={13} />
+                    </button>
                   </div>
                 ))}
               </section>
@@ -730,6 +818,26 @@ export default function Home() {
               <span className="status-key">ЗАГОТОВКА</span>{" "}
               {formatLength(derived.blank.length, unit)} × {formatLength(derived.blank.width, unit)} ×{" "}
               {formatLength(derived.blank.thickness, unit)}
+              {derived.widthShortfall > 0 && (
+                <>
+                  <span className="status-key">НЕДОБОР Ш</span> {formatLength(derived.widthShortfall, unit)}
+                </>
+              )}
+              {derived.widthTrim > 0 && (
+                <>
+                  <span className="status-key">ОБРЕЗЬ Ш</span> {formatLength(derived.widthTrim, unit)}
+                </>
+              )}
+              {derived.lengthShortfall > 0 && (
+                <>
+                  <span className="status-key">НЕДОБОР Д</span> {formatLength(derived.lengthShortfall, unit)}
+                </>
+              )}
+              {derived.lengthTrim > 0 && (
+                <>
+                  <span className="status-key">ОБРЕЗЬ Д</span> {formatLength(derived.lengthTrim, unit)}
+                </>
+              )}
             </>
           )}
         </div>

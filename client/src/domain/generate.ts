@@ -1,6 +1,6 @@
 import { blockCols, blockRows, syncCourses } from "./blocks";
 import { SPECIES } from "./defaults";
-import { stripCount, syncStrips } from "./derive";
+import { stripsToCover } from "./derive";
 import type { Project, Stick } from "./types";
 
 function mulberry32(seed: number) {
@@ -37,20 +37,15 @@ export function generateSequence(base: Project, seed: number): Project {
     width: widths[Math.floor(rand() * widths.length)],
   }));
   const width = sticks.reduce((sum, s) => sum + s.width, 0);
-  const draft: Project = {
+  const count = stripsToCover(base.board.length, base.motifWidth);
+  return {
     ...base,
     name: `Случай / ${String(seed).padStart(2, "0")}`,
     board: { ...base.board, width },
     sticks,
-    strips: [],
-  };
-  const synced = syncStrips(draft);
-  const n = stripCount(synced);
-  return {
-    ...synced,
-    strips: Array.from({ length: n }, () => ({
+    strips: Array.from({ length: count }, () => ({
       flip: rand() > 0.55,
-      offset: rand() > 0.7 ? sticks[0].width : 0,
+      offset: rand() > 0.7 ? (sticks[0]?.width ?? 0) : 0,
     })),
   };
 }

@@ -1,6 +1,6 @@
-import { DEFAULT_BLOCK_SIZE, DEFAULT_STICK_WIDTH, emptyProject } from "./defaults";
+import { DEFAULT_BLOCK_SIZE, DEFAULT_MOTIF_WIDTH, DEFAULT_STICK_WIDTH, emptyProject } from "./defaults";
 import { blockCols, blockRows, syncCourses } from "./blocks";
-import { stripCount, syncStrips } from "./derive";
+import { stripsToCover } from "./derive";
 import type { Project, Stick } from "./types";
 
 export type TemplateId =
@@ -127,9 +127,10 @@ function applyStripTemplate(id: TemplateId, base: Project): Project {
   if (id === "sunset") named = withSticks(base, "Закат", sunsetSticks(base));
   if (id === "butcher") named = withSticks(base, "Мясная лавка", butcherSticks(base));
   if (id === "accent") named = withSticks(base, "Акцент", accentSticks(base));
-  const synced = syncStrips(named);
-  const unit = synced.sticks[0]?.width ?? DEFAULT_STICK_WIDTH;
-  return { ...synced, strips: stripOps(id, stripCount(synced), unit) };
+  const motif = named.motifWidth > 0 ? named.motifWidth : DEFAULT_MOTIF_WIDTH;
+  const unit = named.sticks[0]?.width ?? DEFAULT_STICK_WIDTH;
+  const count = stripsToCover(named.board.length, motif);
+  return { ...named, motifWidth: motif, strips: stripOps(id, count, unit) };
 }
 
 function fillCourses(base: Project, name: string, cell: (r: number, c: number, cols: number) => string): Project {
@@ -194,6 +195,7 @@ export function applyTemplate(id: TemplateId, base?: Project): Project {
     species: base?.species ? base.species.map((s) => ({ ...s })) : seed.species,
     shopPath: base?.shopPath ?? "strip",
     blockSize: base?.blockSize ?? DEFAULT_BLOCK_SIZE,
+    motifWidth: base?.motifWidth ?? seed.motifWidth,
     board: {
       ...seed.board,
       length: base?.board.length ?? seed.board.length,

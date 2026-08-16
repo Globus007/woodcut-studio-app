@@ -75,6 +75,8 @@
 .sheet-warns{margin:0;padding-left:18px;color:#d8cfc2}
 .sheet-caution{margin:14px 0 0;color:#a9947c;font-size:12px}
 .sheet-refuse{margin:0 0 18px;padding:10px 12px;border-left:3px solid #e07060;background:rgba(224,112,96,.1);color:#e7b2aa}
+.sheet-refuse p{margin:0 0 8px}
+.sheet-refuse ul{margin:0;padding-left:18px}
 @media(max-width:760px){.sheet-head,.sheet-split,.sheet-row{grid-template-columns:1fr;display:grid}.sheet-doc{padding:22px 16px}.sheet-chrome{padding:0 14px}}
 @media print {
   .sheet-chrome,.topbar,.workspace,.bottom-status{display:none!important}
@@ -83,6 +85,8 @@
   #shop-instruction h1,#shop-instruction dd,#shop-instruction .sheet-species li,#shop-instruction .sheet-takeoff td{color:#111}
   #shop-instruction h2,#shop-instruction dt,#shop-instruction .sheet-sub,#shop-instruction .sheet-empty{color:#444}
   #shop-instruction .sheet-face,#shop-instruction .sheet-map,#shop-instruction .sheet-row-bar{border-color:#ccc}
+  .sheet-doc.is-refused .sheet-print-body{display:none!important}
+  .sheet-doc.is-refused .sheet-refuse{color:#111;background:transparent;border-left-color:#111}
 }
 /* desk-home */
 .status-icon.refuse{color:#e07060;background:rgba(224,112,96,.11)}
@@ -110,3 +114,11 @@
 .allowance-grid .field-hint{display:block;margin-top:5px;font:8px 'IBM Plex Mono';letter-spacing:.08em;color:#6e665d;font-style:normal}
 .strip-row label.flip{display:flex;align-items:center;gap:6px;flex:1;color:#b4aa9d;font-size:11px}
 .icon-mini{height:30px;width:30px;border:1px solid #453b32;background:#29231f;color:#b8aa9b;padding:0;display:grid;place-items:center;border-radius:4px}
+.icon-mini:disabled{opacity:.35;cursor:not-allowed}
+.face-fit{position:absolute;left:20px;top:18px;display:flex;flex-wrap:wrap;gap:6px;z-index:2;pointer-events:none;max-width:46%}
+.fit-tag{font:500 9px 'IBM Plex Mono';letter-spacing:.06em;padding:3px 6px;border-radius:3px;background:#211e1b;border:1px solid var(--line)}
+.fit-tag.shortfall{color:#e07060;border-color:#6a3530}
+.fit-tag.trim{color:var(--amber);border-color:#6a5328}
+.panel-section .field-hint{display:block;margin-top:6px;font:8px 'IBM Plex Mono';letter-spacing:.08em;color:#6e665d;font-style:normal}
+.canvas-footer{height:auto;min-height:55px;padding-top:10px;padding-bottom:10px}
+.status-line small{max-width:72vw;line-height:1.45}

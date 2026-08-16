@@ -19,7 +19,7 @@ export default function InstructionPage() {
     () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
     [],
   );
-  const unit = useMemo(() => loadUnit(sessionStorage, UNIT_KEY), []);
+  const unit = useMemo(() => loadUnit(localStorage, UNIT_KEY), []);
   const refused = hasRefuse(evaluateChecks(project));
 
   return (

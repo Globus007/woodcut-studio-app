@@ -1,6 +1,5 @@
 import { syncCourses } from "./blocks";
-import { DEFAULT_BLOCK_SIZE, emptyProject, SPECIES } from "./defaults";
-import { syncStrips } from "./derive";
+import { DEFAULT_BLOCK_SIZE, DEFAULT_MOTIF_WIDTH, emptyProject, SPECIES } from "./defaults";
 import type { Project, ShopPath, Species, Stick, StripOp, Unit } from "./types";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -68,6 +67,8 @@ export function parseProject(raw: string): Project | null {
     if (!isRecord(data) || data.version !== 1) return null;
     const board = isRecord(data.board) ? data.board : {};
     const fallback = emptyProject();
+    const sticks = parseSticks(data.sticks);
+    const strips = parseStrips(data.strips);
     const project: Project = {
       version: 1,
       name: asString(data.name, fallback.name),
@@ -77,17 +78,21 @@ export function parseProject(raw: string): Project | null {
         width: asNumber(board.width, fallback.board.width),
         thickness: asNumber(board.thickness, fallback.board.thickness),
       },
+      motifWidth:
+        "motifWidth" in data
+          ? asNumber(data.motifWidth, sticks[0]?.width ?? DEFAULT_MOTIF_WIDTH)
+          : (sticks[0]?.width ?? DEFAULT_MOTIF_WIDTH),
       kerf: asNumber(data.kerf, fallback.kerf),
       surfacing: asNumber(data.surfacing, fallback.surfacing),
       extraLength: asNumber(data.extraLength, fallback.extraLength),
       squareUp: asNumber(data.squareUp, fallback.squareUp),
       species: parseSpecies(data.species),
-      sticks: parseSticks(data.sticks),
-      strips: parseStrips(data.strips),
+      sticks,
+      strips,
       blockSize: asNumber(data.blockSize, DEFAULT_BLOCK_SIZE),
       courses: parseCourses(data.courses),
     };
-    return project.shopPath === "block" ? syncCourses(project) : syncStrips(project);
+    return project.shopPath === "block" ? syncCourses(project) : project;
   } catch {
     return null;
   }

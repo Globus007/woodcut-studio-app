@@ -10,8 +10,10 @@ import {
 } from "./blocks";
 import type { Derived, FaceCell, Gen1Blank, Project, ShopPath, TakeoffRow } from "./types";
 
+export const FIT_EPS = 1e-6;
+
 export function motifWidth(project: Project): number {
-  return project.sticks[0]?.width ?? 0;
+  return project.motifWidth;
 }
 
 export function stickSum(project: Project): number {
@@ -19,9 +21,47 @@ export function stickSum(project: Project): number {
 }
 
 export function stripCount(project: Project): number {
-  const motif = motifWidth(project);
-  if (motif <= 0) return 0;
-  return Math.max(1, Math.round(project.board.length / motif));
+  return project.strips.length;
+}
+
+export function coverage(project: Project): number {
+  return stripCount(project) * motifWidth(project);
+}
+
+export function axisFit(built: number, finished: number): { shortfall: number; trim: number } {
+  const delta = finished - built;
+  if (Math.abs(delta) <= FIT_EPS) return { shortfall: 0, trim: 0 };
+  if (delta > 0) return { shortfall: delta, trim: 0 };
+  return { shortfall: 0, trim: -delta };
+}
+
+export function stripsToCover(length: number, motif: number): number {
+  if (motif <= 0) return 1;
+  return Math.max(1, Math.ceil((length - FIT_EPS) / motif));
+}
+
+export function addStrip(project: Project): Project {
+  return { ...project, strips: [...project.strips, { flip: false, offset: 0 }] };
+}
+
+export function removeStrip(project: Project, index: number): Project {
+  return { ...project, strips: project.strips.filter((_, i) => i !== index) };
+}
+
+export function moveStrip(project: Project, from: number, to: number): Project {
+  if (
+    from === to ||
+    from < 0 ||
+    to < 0 ||
+    from >= project.strips.length ||
+    to >= project.strips.length
+  ) {
+    return project;
+  }
+  const strips = project.strips.slice();
+  const [row] = strips.splice(from, 1);
+  strips.splice(to, 0, row);
+  return { ...project, strips };
 }
 
 export function crosscutWidth(project: Project): number {
@@ -35,16 +75,6 @@ export function gen1Blank(project: Project): Gen1Blank {
     width: stickSum(project) + project.squareUp,
     thickness: motifWidth(project),
   };
-}
-
-export function syncStrips(project: Project): Project {
-  const count = stripCount(project);
-  const strips = project.strips.slice(0, count);
-  while (strips.length < count) {
-    const prev = strips[strips.length - 1];
-    strips.push({ flip: false, offset: prev?.offset ?? 0 });
-  }
-  return { ...project, strips };
 }
 
 export function takeoff(project: Project): TakeoffRow[] {
@@ -78,6 +108,10 @@ export function wasteRatio(project: Project): number | null {
 export function derive(project: Project): Derived {
   const motif = motifWidth(project);
   const count = stripCount(project);
+  const builtWidth = stickSum(project);
+  const builtLength = coverage(project);
+  const widthFit = axisFit(builtWidth, project.board.width);
+  const lengthFit = axisFit(builtLength, project.board.length);
   const blank = gen1Blank(project);
   const finishedVolume = project.board.length * project.board.width * project.board.thickness;
   const cols = blockCols(project);
@@ -91,14 +125,18 @@ export function derive(project: Project): Derived {
   return {
     motifWidth: motif,
     stripCount: count,
+    coverage: builtLength,
     crosscutWidth: crosscutWidth(project),
-    remainder: project.shopPath === "block" ? remY : motif > 0 ? project.board.length - count * motif : project.board.length,
+    widthShortfall: widthFit.shortfall,
+    widthTrim: widthFit.trim,
+    lengthShortfall: lengthFit.shortfall,
+    lengthTrim: lengthFit.trim,
     remainderX: remX,
     remainderY: remY,
     blockCols: cols,
     blockRows: rows,
     blank,
-    stickSum: stickSum(project),
+    stickSum: builtWidth,
     takeoff: takeoff(project),
     wasteRatio: wasteRatio(project),
     finishedVolume,
@@ -143,24 +181,44 @@ export function faceRow(project: Project, stripIndex: number): FaceCell[] {
   return cycleCells(oriented, strip.offset, span);
 }
 
+function clipCells(cells: FaceCell[], span: number): FaceCell[] {
+  if (span <= 0) return [];
+  const out: FaceCell[] = [];
+  let filled = 0;
+  for (const cell of cells) {
+    if (filled >= span) break;
+    const take = Math.min(cell.width, span - filled);
+    if (take > 0) out.push({ speciesId: cell.speciesId, width: take });
+    filled += take;
+  }
+  return out;
+}
+
 export function faceGrid(project: Project): FaceCell[][] {
   if (project.shopPath === "block") {
     const synced = syncCourses(project);
     const size = synced.blockSize || DEFAULT_BLOCK_SIZE;
     return synced.courses.map((course) => course.map((speciesId) => ({ speciesId, width: size })));
   }
-  const synced = syncStrips(project);
-  return synced.strips.map((_, index) => faceRow(synced, index));
+  const motif = motifWidth(project);
+  const painted = Math.min(stickSum(project), project.board.width);
+  const rows: FaceCell[][] = [];
+  for (let index = 0; index < project.strips.length; index += 1) {
+    const y = index * motif;
+    if (y >= project.board.length - FIT_EPS) break;
+    rows.push(clipCells(faceRow(project, index), painted));
+  }
+  return rows;
 }
 
-function speciesAtX(row: FaceCell[], x: number): string {
-  if (row.length === 0) return "walnut";
+function speciesAtX(row: FaceCell[], x: number): string | null {
+  if (row.length === 0 || x < 0) return null;
   let cursor = x;
   for (const cell of row) {
     if (cursor < cell.width) return cell.speciesId;
     cursor -= cell.width;
   }
-  return row[row.length - 1].speciesId;
+  return null;
 }
 
 export function bakeToBlocks(project: Project): Project {
@@ -170,16 +228,23 @@ export function bakeToBlocks(project: Project): Project {
     blockSize: project.blockSize > 0 ? project.blockSize : DEFAULT_BLOCK_SIZE,
   };
   const next = syncCourses({ ...sized, courses: [] });
-  const synced = syncStrips(project);
-  const motif = motifWidth(synced);
+  const motif = motifWidth(project);
   const rows = blockRows(next);
   const cols = blockCols(next);
-  if (motif <= 0 || synced.sticks.length === 0) return next;
+  if (motif <= 0 || project.sticks.length === 0) return next;
+  const fill = next.species[0]?.id ?? "walnut";
+  const painted = stickSum(project);
+  const covered = coverage(project);
   const courses = Array.from({ length: rows }, (_, r) => {
     const y = (r + 0.5) * next.blockSize;
-    const stripIndex = Math.min(synced.strips.length - 1, Math.max(0, Math.floor(y / motif)));
-    const row = faceRow(synced, stripIndex);
-    return Array.from({ length: cols }, (_, c) => speciesAtX(row, (c + 0.5) * next.blockSize));
+    if (y >= covered) return Array.from({ length: cols }, () => fill);
+    const stripIndex = Math.min(project.strips.length - 1, Math.max(0, Math.floor(y / motif)));
+    const row = faceRow(project, stripIndex);
+    return Array.from({ length: cols }, (_, c) => {
+      const x = (c + 0.5) * next.blockSize;
+      if (x >= painted) return fill;
+      return speciesAtX(row, x) ?? fill;
+    });
   });
   return { ...next, courses };
 }
