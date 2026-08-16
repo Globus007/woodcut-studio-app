@@ -7,7 +7,7 @@ export function formatLength(mm: number, unit: Unit): string {
 
 export function toDisplay(mm: number, unit: Unit): number {
   if (unit === "in") return Math.round((mm / 25.4) * 100) / 100;
-  return mm;
+  return Math.round(mm * 10) / 10;
 }
 
 export function fromDisplay(value: number, unit: Unit): number {

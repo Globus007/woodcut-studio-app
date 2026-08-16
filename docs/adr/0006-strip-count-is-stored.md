@@ -1,0 +1,3 @@
+# Strip count is stored; length shortfall is not a remainder
+
+Finished length and motif width stay inputs. The strip list is stored: add or remove a strip changes count only, not length. When `count × motif` is short of length, that finished board does not exist — refuse paper. When it is long, the extra is trim: warn, print, clip the face to the typed length from the first strip. Changing length or motif does not rewrite flip or offset rows. Templates and generate write enough strips that a new pattern does not open in shortfall. Rejected: deriving count from `length ÷ motif`, growing length when they add a strip, and a remainder field on the length axis.

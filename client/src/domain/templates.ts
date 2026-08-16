@@ -17,17 +17,18 @@ export type Template = {
   id: TemplateId;
   name: string;
   description: string;
+  blockDescription: string;
 };
 
 export const TEMPLATES: Template[] = [
-  { id: "stripes", name: "Полосы", description: "слои вдоль доски" },
-  { id: "checker", name: "Шахматы", description: "переворот через одну" },
-  { id: "brick", name: "Кирпич", description: "сдвиг на одну палку" },
-  { id: "herring", name: "Ёлочка", description: "ступенчатая диагональ" },
-  { id: "weave", name: "Плетёнка", description: "AABB и сдвиг на две" },
-  { id: "sunset", name: "Закат", description: "породы по светлоте" },
-  { id: "butcher", name: "Мясная лавка", description: "широкие жилы" },
-  { id: "accent", name: "Акцент", description: "поле и тонкая жила" },
+  { id: "stripes", name: "Полосы", description: "слои вдоль доски", blockDescription: "столбцы по породам" },
+  { id: "checker", name: "Шахматы", description: "переворот через одну", blockDescription: "клетка через одну" },
+  { id: "brick", name: "Кирпич", description: "сдвиг на одну палку", blockDescription: "ряд со сдвигом" },
+  { id: "herring", name: "Ёлочка", description: "ступенчатая диагональ", blockDescription: "диагональ по клеткам" },
+  { id: "weave", name: "Плетёнка", description: "AABB и сдвиг на две", blockDescription: "пары клеток со сдвигом" },
+  { id: "sunset", name: "Закат", description: "породы по светлоте", blockDescription: "породы по светлоте" },
+  { id: "butcher", name: "Мясная лавка", description: "широкие жилы", blockDescription: "широкие жилы" },
+  { id: "accent", name: "Акцент", description: "поле и тонкая жила", blockDescription: "поле и жила по центру" },
 ];
 
 function pair(project: Project): [string, string] {
@@ -101,7 +102,11 @@ function withSticks(base: Project, name: string, sticks: Stick[]): Project {
   };
 }
 
-function stripOps(id: TemplateId, count: number, unit: number): Project["strips"] {
+export function isTemplateId(id: string): id is TemplateId {
+  return TEMPLATES.some((template) => template.id === id);
+}
+
+export function stripOps(id: TemplateId, count: number, unit: number): Project["strips"] {
   if (id === "checker") {
     return Array.from({ length: count }, (_, i) => ({ flip: i % 2 === 1, offset: 0 }));
   }

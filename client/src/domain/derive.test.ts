@@ -5,6 +5,7 @@ import {
   addStrip,
   bakeToBlocks,
   derive,
+  extraStripsForShortfall,
   faceGrid,
   faceRow,
   gen1Blank,
@@ -187,13 +188,29 @@ describe("block path", () => {
     expect(lastCol).toBe(project.species[0].id);
   });
 
-  it("bakes a strip face onto courses and refuses the reverse", () => {
+  it("bakes a strip face onto courses and restores the stored strip construction", () => {
     const strip = applyTemplate("checker");
     const baked = bakeToBlocks(strip);
     expect(baked.shopPath).toBe("block");
     expect(baked.courses.length).toBe(20);
     expect(baked.courses[0].length).toBe(14);
-    expect(setShopPath(baked, "strip")).toBeNull();
+    const painted = {
+      ...baked,
+      courses: baked.courses.map((row) => row.map(() => baked.species[0].id)),
+    };
+    const restored = setShopPath(painted, "strip");
+    expect(restored.shopPath).toBe("strip");
+    expect(restored.sticks).toEqual(strip.sticks);
+    expect(restored.strips).toEqual(strip.strips);
+    expect(restored.motifWidth).toBe(strip.motifWidth);
+    expect(restored.courses).toEqual(painted.courses);
+  });
+
+  it("says how many strips close a length shortfall", () => {
+    expect(extraStripsForShortfall(100, 20)).toBe(5);
+    expect(extraStripsForShortfall(9, 20)).toBe(1);
+    expect(extraStripsForShortfall(0, 20)).toBe(0);
+    expect(extraStripsForShortfall(20, 0)).toBe(0);
   });
 
   it("counts blocks on the takeoff", () => {

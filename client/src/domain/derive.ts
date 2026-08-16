@@ -40,6 +40,11 @@ export function stripsToCover(length: number, motif: number): number {
   return Math.max(1, Math.ceil((length - FIT_EPS) / motif));
 }
 
+export function extraStripsForShortfall(shortfall: number, motif: number): number {
+  if (!(shortfall > FIT_EPS) || !(motif > 0)) return 0;
+  return Math.ceil((shortfall - FIT_EPS) / motif);
+}
+
 export function addStrip(project: Project): Project {
   return { ...project, strips: [...project.strips, { flip: false, offset: 0 }] };
 }
@@ -249,10 +254,10 @@ export function bakeToBlocks(project: Project): Project {
   return { ...next, courses };
 }
 
-export function setShopPath(project: Project, path: ShopPath): Project | null {
+export function setShopPath(project: Project, path: ShopPath): Project {
   if (project.shopPath === path) return project;
   if (path === "block") return bakeToBlocks(project);
-  return null;
+  return { ...project, shopPath: "strip" };
 }
 
 export function speciesColor(project: Project, speciesId: string): string {

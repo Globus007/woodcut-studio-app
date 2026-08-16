@@ -41,12 +41,24 @@ One clamp-up of full-length members on the strip path. That path uses two genera
 _Avoid_: layer, step (except as UI copy for a glue-up step), glue-up generation count beyond two, calling a course a generation
 
 **Generation 1**:
-The long-grain panel. Its thickness becomes the motif width on the finished face; its width is the finished board width.
-_Avoid_: first glue-up as a grid of cells
+The long-grain panel glued from the sticks. Its thickness becomes the motif width. As glued, its width is the stick sum; after jointing that width is the finished board width.
+_Avoid_: first glue-up as a grid of cells, treating a shortfall as a finished board with an empty field
+
+**Shortfall**:
+On the strip path, the built size is less than the finished size on that axis: stick sum vs width, or strip count × motif width vs length. That finished board does not exist yet.
+_Avoid_: remainder, leftover, empty field as on the block path
+
+**Trim**:
+On the strip path, the built size is greater than the finished size on that axis. The extra is planned jointing off the far edge (after the first stick, or after the first strip).
+_Avoid_: remainder, leftover, drawing the extra as if it were still on the finished face
+
+**Motif width**:
+The thickness of the generation-1 panel, and therefore the width of each strip on the finished face. The carpenter sets it; it is not a stick width.
+_Avoid_: first stick width, cell size, grid size, inferring it from stick widths
 
 **Strip**:
-A crosscut slice of the generation-1 panel, stood on end so end grain faces up, then rearranged as a whole.
-_Avoid_: row, lamella, part (ТОРЦЕГРАММА)
+A crosscut slice of the generation-1 panel, stood on end so end grain faces up, then rearranged as a whole. How many strips is an input — the stored list — not `length ÷ motif`.
+_Avoid_: row, lamella, part (ТОРЦЕГРАММА), deriving count from length
 
 **Generation 2**:
 The end-grain panel made by gluing the standing strips. On the strip path this is the board.
@@ -69,8 +81,8 @@ The list to take to the saw. On the strip path: sticks to rip — species, width
 _Avoid_: BOM, bill of materials, m³ shopping cart, a bag of loose cubes
 
 **Waste**:
-Derived leftover: stock volume minus finished volume, as a percentage. Kerf, surfacing, extra length, and remainder at the board edge are the causes.
-_Avoid_: a mood formula, contingency percent
+Derived leftover: stock volume minus finished volume, as a percentage. Kerf, surfacing, extra length, trim, and the block-path remainder at the board edge are the causes.
+_Avoid_: a mood formula, contingency percent, calling a shortfall waste
 
 **Shop instruction**:
 The one printable document of the construction sequence. The carpenter reads and prints it on its own sheet page, not in a desk pane.

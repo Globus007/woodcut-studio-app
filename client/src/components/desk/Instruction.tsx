@@ -74,10 +74,10 @@ function StickOrderMap(props: { project: Project; unit: Unit }): JSX.Element {
 function StripMap(props: { project: Project; unit: Unit; count: number }): JSX.Element {
   const { project, unit, count } = props;
   if (count === 0) {
-    return <p className="sheet-empty">Ломтей нет</p>;
+    return <p className="sheet-empty">Полос нет</p>;
   }
   return (
-    <div className="sheet-rows" aria-label="Карта ломтей поколения 2">
+    <div className="sheet-rows" aria-label="Карта полос поколения 2">
       {Array.from({ length: count }, (_, index) => {
         const strip = project.strips[index] ?? { flip: false, offset: 0 };
         const row = faceRow(project, index);
@@ -94,7 +94,7 @@ function StripMap(props: { project: Project; unit: Unit; count: number }): JSX.E
             </div>
             <div className="sheet-row-meta">
               <b>{strip.flip ? "переворот" : "как есть"}</b>
-              <span>сдвиг {formatLength(strip.offset, unit)}</span>
+              <span>сдвиг мотива {formatLength(strip.offset, unit)} · по кругу</span>
             </div>
           </div>
         );
@@ -139,7 +139,10 @@ export function Instruction(props: {
   const warnings = checks.filter((check) => check.level === "warn");
   const usedIds = usedSpeciesIds(project);
   const blockPath = project.shopPath === "block";
-  const wasteText = derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`;
+  const wasteHidden =
+    !blockPath && (derived.widthShortfall > 0 || derived.lengthShortfall > 0);
+  const wasteText =
+    wasteHidden || derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`;
   const unitLabel = unit === "in" ? "дюймы" : "миллиметры";
 
   return (
@@ -160,7 +163,9 @@ export function Instruction(props: {
         <div>
           <p className="sheet-kicker">ЦЕХОВАЯ ИНСТРУКЦИЯ</p>
           <h1>{project.name}</h1>
-          <p className="sheet-sub">{blockPath ? "шашки → ряды → щит" : "палки → ломти"}</p>
+          <p className="sheet-sub">
+            {blockPath ? "шашки → ряды → щит" : "палки → щит → ломти"}
+          </p>
         </div>
         <dl className="sheet-facts">
           <div>
@@ -364,6 +369,7 @@ export function Instruction(props: {
         </table>
         <p className="sheet-waste">
           Отход <b>{wasteText}</b>
+          {wasteHidden ? " · недобор — не отход, такой доски нет" : null}
         </p>
       </section>
 

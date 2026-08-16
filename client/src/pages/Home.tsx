@@ -17,13 +17,25 @@ import {
   ScrollText,
   WandSparkles,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   applyTemplate,
+  BLOCK_GEN_FAMILIES,
   generateSequence,
   derive,
   evaluateChecks,
+  extraStripsForShortfall,
   hasRefuse,
   loadProject,
   loadUnit,
@@ -49,6 +61,8 @@ import {
   DEFAULT_MOTIF_WIDTH,
   DEFAULT_STICK_WIDTH,
   STANDARD_WIDTHS,
+  type BlockGenFamily,
+  type Derived,
   type Project,
   type ShopPath,
   type TemplateId,
@@ -68,6 +82,44 @@ function readMm(raw: string, unit: Unit): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n)) return null;
   return fromDisplay(n, unit);
+}
+
+function bootDesk(): { project: Project; saved: boolean } {
+  const loaded = loadProject(localStorage, STORAGE_KEY);
+  return loaded
+    ? { project: loaded, saved: true }
+    : { project: applyTemplate("stripes"), saved: false };
+}
+
+function lengthFitHint(derived: Derived, unit: Unit): string {
+  const cover = formatLength(derived.coverage, unit);
+  if (derived.lengthShortfall > 0) {
+    const extra = extraStripsForShortfall(derived.lengthShortfall, derived.motifWidth);
+    return `покрытие ${cover} · не хватает ${formatLength(derived.lengthShortfall, unit)} · добавь ${extra} полос`;
+  }
+  if (derived.lengthTrim > 0) {
+    return `покрытие ${cover} · обрезь ${formatLength(derived.lengthTrim, unit)}`;
+  }
+  return `покрытие ${cover} · в размер`;
+}
+
+function widthFitHint(derived: Derived, unit: Unit): string {
+  const sticks = formatLength(derived.stickSum, unit);
+  if (derived.widthShortfall > 0) {
+    return `палки ${sticks} · не хватает ${formatLength(derived.widthShortfall, unit)} · добавь палку`;
+  }
+  if (derived.widthTrim > 0) {
+    return `палки ${sticks} · обрезь ${formatLength(derived.widthTrim, unit)} от первой`;
+  }
+  return `палки ${sticks} · в размер`;
+}
+
+function wasteLabel(project: Project, derived: Derived, refuse: boolean): string {
+  if (project.shopPath === "strip" && (derived.widthShortfall > 0 || derived.lengthShortfall > 0)) {
+    return "—";
+  }
+  if (refuse && derived.wasteRatio == null) return "—";
+  return derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`;
 }
 
 function exportFaceSvg(project: Project) {
@@ -116,17 +168,20 @@ function UnitField({
   unit,
   onMm,
   step,
+  label,
 }: {
   valueMm: number;
   unit: Unit;
   onMm: (mm: number) => void;
   step?: number;
+  label?: string;
 }) {
   return (
     <Input
       type="number"
       step={step ?? (unit === "in" ? 0.05 : 1)}
       value={toDisplay(valueMm, unit)}
+      aria-label={label}
       onChange={(e) => {
         const mm = readMm(e.target.value, unit);
         if (mm !== null) onMm(mm);
@@ -152,16 +207,19 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
-  const [project, setProject] = useState<Project>(
-    () => loadProject(localStorage, STORAGE_KEY) ?? applyTemplate("stripes"),
-  );
+  const [project, setProject] = useState<Project>(() => bootDesk().project);
   const [unit, setUnit] = useState<Unit>(() => loadUnit(localStorage, UNIT_KEY));
   const [seed, setSeed] = useState(1);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(() => bootDesk().saved);
   const [view3d, setView3d] = useState(false);
   const [rotation, setRotation] = useState(DEFAULT_ROTATION);
-  const [templateId, setTemplateId] = useState<TemplateId | null>("stripes");
+  const [templateId, setTemplateId] = useState<TemplateId | null>(() =>
+    bootDesk().saved ? null : "stripes",
+  );
+  const [blockFamily, setBlockFamily] = useState<BlockGenFamily>("swirl");
+  const [genScale, setGenScale] = useState(2);
   const [brushId, setBrushId] = useState("walnut");
+  const [pathConfirm, setPathConfirm] = useState<ShopPath | null>(null);
 
   const derived = useMemo(() => derive(project), [project]);
   const checks = useMemo(() => evaluateChecks(project), [project]);
@@ -191,7 +249,7 @@ export default function Home() {
 
   const downloadJson = () => {
     downloadProject(project);
-    toast.success("JSON скачан");
+    toast.success("Файл скачан");
   };
 
   const openFile = async (file?: File) => {
@@ -210,26 +268,49 @@ export default function Home() {
   const generate = () => {
     const nextSeed = seed + 1;
     setSeed(nextSeed);
-    setTemplateId(null);
-    commit(generateSequence(project, nextSeed));
-    toast.success("Узор собран", { description: `Зерно ${nextSeed}` });
+    const next =
+      project.shopPath === "block"
+        ? generateSequence(project, nextSeed, { family: blockFamily, scale: genScale })
+        : generateSequence(project, nextSeed, { family: templateId ?? undefined });
+    if (project.shopPath === "block") {
+      setTemplateId(null);
+    } else if (!templateId) {
+      const match = TEMPLATES.find((tpl) => next.name.startsWith(tpl.name));
+      if (match) setTemplateId(match.id);
+    }
+    commit(next);
+    const widthChanged = next.board.width !== project.board.width;
+    toast.success("Узор собран", {
+      description: widthChanged
+        ? `${next.name} · ширина стала ${formatLength(next.board.width, unit)} — сумма палок`
+        : next.name,
+    });
   };
 
   const applyQuick = (id: TemplateId) => {
     setTemplateId(id);
-    commit(applyTemplate(id, project));
-    toast.success(`Шаблон «${TEMPLATES.find((t) => t.id === id)?.name ?? id}» применён`);
+    const next = applyTemplate(id, project);
+    commit(next);
+    const widthChanged = next.board.width !== project.board.width;
+    const name = TEMPLATES.find((t) => t.id === id)?.name ?? id;
+    toast.success(`Шаблон «${name}» применён`, {
+      description: widthChanged
+        ? `ширина стала ${formatLength(next.board.width, unit)} — сумма палок`
+        : undefined,
+    });
+  };
+
+  const applyPath = (path: ShopPath) => {
+    const next = setShopPath(project, path);
+    setTemplateId(null);
+    setPathConfirm(null);
+    commit(next);
+    toast.success(path === "block" ? "Теперь клеим шашками" : "Снова палки — сетка сброшена");
   };
 
   const changePath = (path: ShopPath) => {
-    const next = setShopPath(project, path);
-    if (!next) {
-      toast.error("Из шашек обратно в палки нельзя — сетка уже не один щит.");
-      return;
-    }
-    setTemplateId(null);
-    commit(next);
-    toast.success(path === "block" ? "Цех шашек: лицо запечено в сетку" : "Цех палок");
+    if (path === project.shopPath) return;
+    setPathConfirm(path);
   };
 
   const paint = (row: number, col: number) => {
@@ -326,7 +407,7 @@ export default function Home() {
             <Save size={15} /> Сохранить
           </Button>
           <Button variant="outline" className="action-button" onClick={downloadJson}>
-            <Download size={15} /> JSON
+            <Download size={15} /> Файл
           </Button>
           <Button variant="outline" className="action-button" onClick={() => fileRef.current?.click()}>
             <FolderOpen size={15} /> Открыть
@@ -335,10 +416,10 @@ export default function Home() {
             className="accent-button"
             onClick={() => {
               exportFaceSvg(project);
-              toast.success("Лицо сохранено в SVG");
+              toast.success("Лицо сохранено");
             }}
           >
-            <ImageDown size={15} /> SVG
+            <ImageDown size={15} /> Лицо
           </Button>
         </div>
       </header>
@@ -374,10 +455,10 @@ export default function Home() {
             <div className="toolbar-actions">
               <div className="segmented">
                 <button className={!view3d ? "selected" : ""} onClick={() => setView3d(false)}>
-                  2D
+                  Сверху
                 </button>
                 <button className={view3d ? "selected" : ""} onClick={() => setView3d(true)}>
-                  3D
+                  Объём
                 </button>
               </div>
               <Button variant="ghost" size="icon" aria-label="Сбросить камеру" onClick={resetCamera}>
@@ -424,7 +505,7 @@ export default function Home() {
                   </span>
                   <span>
                     <b>{tpl.name}</b>
-                    <small>{tpl.description}</small>
+                    <small>{project.shopPath === "block" ? tpl.blockDescription : tpl.description}</small>
                   </span>
                 </button>
               ))}
@@ -435,7 +516,7 @@ export default function Home() {
         <aside className="inspector">
               <section className="panel-section">
                 <div className="section-heading">
-                  <span>ЦЕХ</span>
+                  <span>КАК КЛЕИМ</span>
                 </div>
                 <div className="segmented path-switch">
                   <button
@@ -451,6 +532,11 @@ export default function Home() {
                     ШАШКИ
                   </button>
                 </div>
+                <i className="field-hint">
+                  {project.shopPath === "block"
+                    ? "Кладёшь шашки в ряды и склеиваешь ряды. Фото и кисть — только здесь."
+                    : "Склеиваешь палки в щит, пилишь ломти, перекладываешь. Лицо получается само."}
+                </i>
               </section>
 
               <section className="panel-section">
@@ -458,6 +544,35 @@ export default function Home() {
                   <span>ГЕНЕРАТОР</span>
                   <WandSparkles size={14} />
                 </div>
+                {project.shopPath === "block" && (
+                  <>
+                    <div className="gen-chips">
+                      {BLOCK_GEN_FAMILIES.map((family) => (
+                        <button
+                          key={family.id}
+                          type="button"
+                          className={blockFamily === family.id ? "chosen" : ""}
+                          onClick={() => setBlockFamily(family.id)}
+                        >
+                          {family.name}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="width-chips">
+                      {[1, 2, 3, 4].map((k) => (
+                        <button
+                          key={k}
+                          type="button"
+                          className={genScale === k ? "chosen" : ""}
+                          onClick={() => setGenScale(k)}
+                        >
+                          {k}
+                        </button>
+                      ))}
+                    </div>
+                    <i className="field-hint">масштаб поля</i>
+                  </>
+                )}
                 <Button className="generate-button" onClick={generate}>
                   <WandSparkles size={16} /> Собрать узор <kbd>G</kbd>
                 </Button>
@@ -557,9 +672,10 @@ export default function Home() {
                   <span>{unitShort}</span>
                 </div>
                 <i className="field-hint">
+                  толщина первого щита и ширина полосы на лице, не ширина палки
                   {project.motifWidth === DEFAULT_MOTIF_WIDTH
-                    ? `дефолт ${formatLength(DEFAULT_MOTIF_WIDTH, unit)}`
-                    : "вход"}
+                    ? ` · дефолт ${formatLength(DEFAULT_MOTIF_WIDTH, unit)}`
+                    : " · вход"}
                 </i>
               </section>
               <section className="panel-section">
@@ -567,6 +683,7 @@ export default function Home() {
                   <span>ПАЛКИ</span>
                   <button
                     type="button"
+                    aria-label="Добавить палку"
                     onClick={() => {
                       const speciesId = project.species[0]?.id;
                       if (!speciesId) return;
@@ -579,6 +696,7 @@ export default function Home() {
                     <Plus size={12} /> добавить
                   </button>
                 </div>
+                <i className="field-hint">склеиваются в первый щит, слева направо</i>
                 {project.sticks.map((stick, index) => (
                   <div className="stick-row" key={`${stick.speciesId}-${index}`}>
                     <select
@@ -631,10 +749,18 @@ export default function Home() {
               <section className="panel-section">
                 <div className="section-heading">
                   <span>ПОЛОСЫ</span>
-                  <button type="button" onClick={() => commit(addStrip(project))}>
+                  <button
+                    type="button"
+                    aria-label="Добавить полосу"
+                    onClick={() => commit(addStrip(project))}
+                  >
                     <Plus size={12} /> добавить
                   </button>
                 </div>
+                <i className="field-hint">
+                  ломти первого щита торцом вверх. добавить не удлиняет доску. число — сдвиг мотива
+                  по кругу, не свес
+                </i>
                 {project.strips.map((strip, index) => (
                   <div className="strip-row" key={index}>
                     <label className="flip">
@@ -655,6 +781,7 @@ export default function Home() {
                       <UnitField
                         valueMm={strip.offset}
                         unit={unit}
+                        label={`Сдвиг полосы ${index + 1}`}
                         onMm={(offset) =>
                           commit({
                             ...project,
@@ -713,6 +840,9 @@ export default function Home() {
                       />
                       <span>{unitShort}</span>
                     </div>
+                    {project.shopPath === "strip" && (
+                      <i className="field-hint">{lengthFitHint(derived, unit)}</i>
+                    )}
                   </label>
                   <label>
                     ШИРИНА
@@ -726,6 +856,9 @@ export default function Home() {
                       />
                       <span>{unitShort}</span>
                     </div>
+                    {project.shopPath === "strip" && (
+                      <i className="field-hint">{widthFitHint(derived, unit)}</i>
+                    )}
                   </label>
                   <label>
                     ТОЛЩИНА
@@ -807,8 +940,7 @@ export default function Home() {
           <span className="status-key">ПРОЕКТ</span> {project.name}
         </div>
         <div>
-          <span className="status-key">ОТХОД</span>{" "}
-          {derived.wasteRatio == null ? "—" : `${(derived.wasteRatio * 100).toFixed(1)}%`}
+          <span className="status-key">ОТХОД</span> {wasteLabel(project, derived, refuse)}
           {project.shopPath === "block" ? (
             <>
               <span className="status-key">ШАШКИ</span> {derived.blockRows}×{derived.blockCols}
@@ -845,7 +977,7 @@ export default function Home() {
           <span className="status-key">ЕДИНИЦЫ</span>
           <div className="unit-switch">
             <button className={`unit-toggle ${unit === "mm" ? "selected" : ""}`} onClick={() => changeUnit("mm")}>
-              MM
+              ММ
             </button>
             <button className={`unit-toggle ${unit === "in" ? "selected" : ""}`} onClick={() => changeUnit("in")}>
               ДЮЙМ
@@ -856,6 +988,50 @@ export default function Home() {
           </button>
         </div>
       </footer>
+
+      <AlertDialog
+        open={pathConfirm !== null}
+        onOpenChange={(open) => {
+          if (!open) setPathConfirm(null);
+        }}
+      >
+        <AlertDialogContent className="desk-confirm">
+          {pathConfirm === "block" ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Собрать лицо шашками?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Это другой способ клейки. Лицо станет сеткой шашек: их кладут в ряды и склеивают
+                  ряды. Пустые места, где палок не хватало, зальются первой породой. Назад к палкам
+                  можно — но сетка, фото и кисть пропадут.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Остаться в палках</AlertDialogCancel>
+                <AlertDialogAction className="accent-button" onClick={() => applyPath("block")}>
+                  К шашкам
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : pathConfirm === "strip" ? (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Вернуться к палкам?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Фото, кисть и ряды шашек пропадут со стола. Вернётся щит из палок, который уже
+                  записан в проекте — не эта сетка.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Остаться в шашках</AlertDialogCancel>
+                <AlertDialogAction className="accent-button" onClick={() => applyPath("strip")}>
+                  К палкам
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : null}
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

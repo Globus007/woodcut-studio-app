@@ -30,7 +30,7 @@ A locked spec for a one-week contest candy: a working end-grain board tool a car
 - [What the on-desk 3D object must show](./issues/11-what-the-on-desk-3d-object-must-show.md) — Thick extrusion: top = end grain, edges = strip stack; clamped orbit; no explode.
 - [Project file format](./issues/12-project-file-format.md) — JSON, mm, sticks + strips; localStorage + download.
 
-Locked spec: [`spec.md`](./spec.md). Glossary: [`CONTEXT.md`](../../CONTEXT.md). ADR: [`docs/adr/0001-glue-first-construction.md`](../../docs/adr/0001-glue-first-construction.md).
+Locked spec: [`spec.md`](./spec.md) — revised in place by [Contest-ready: the candy does not lie](../contest-ready/map.md) so it matches two shop paths and this desk. Glossary: [`CONTEXT.md`](../../CONTEXT.md). ADRs: 0001–0006.
 
 ## Not yet specified
 
