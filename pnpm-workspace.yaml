@@ -11,4 +11,4 @@ minimumReleaseAgeExclude:
   - '@hookform/resolvers@5.9.0'
 
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
